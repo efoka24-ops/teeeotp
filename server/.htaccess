@@ -1,0 +1,26 @@
+# teeeotp — routage et protections.
+#
+# Servi en sous-dossier de trugroup.cm : https://trugroup.cm/teeeotp/v1/...
+#
+# Limite a mod_rewrite et mod_alias : l'hebergement Camoo refuse `Options` et
+# les directives `Require`, qui provoquent une erreur 500.
+
+RewriteEngine On
+RewriteBase /teeeotp/
+
+# Sans cette ligne, Apache ne transmet pas Authorization a PHP et les
+# telephones (Authorization: Bearer dv_…) seraient tous refuses.
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# ─── Protections ────────────────────────────────────────────────────────────
+# Filet de secours si le .env de repli est utilise au lieu de
+# /home/<compte>/teeeotp.env.
+RedirectMatch 404 (?i)/teeeotp/\.env
+RedirectMatch 404 (?i)/teeeotp/(lib|routes)/
+RedirectMatch 404 (?i)/teeeotp/.*\.(sql|log|bak|ini|md)$
+
+# ─── Routage ────────────────────────────────────────────────────────────────
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?__path=$1 [QSA,L]
