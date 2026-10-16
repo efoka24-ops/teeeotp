@@ -17,7 +17,7 @@ return static function (Router $r): void {
         $device = Auth::requireDevice();
 
         $battery = Http::input('battery');
-        Db::update('devices', $device['id'], [
+        Db::update('otp_devices', $device['id'], [
             'lastSeenAt' => Db::now(),
             'lastIp'     => Http::clientIp(),
             'appVersion' => is_string(Http::input('appVersion')) ? mb_substr(Http::input('appVersion'), 0, 20) : $device['appVersion'],

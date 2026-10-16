@@ -92,7 +92,7 @@ return static function (Router $r): void {
 
         $sms = Db::one(
             'SELECT `id`, `kind`, `phone`, `status`, `attempts`, `error`, `createdAt`, `sentAt`, `deliveredAt`, `expiresAt`
-             FROM `sms_messages` WHERE `id` = ? AND `tenantId` = ?',
+             FROM `otp_sms_messages` WHERE `id` = ? AND `tenantId` = ?',
             [$args['id'], $tenant['id']]
         );
         if ($sms === null) {
@@ -123,7 +123,7 @@ return static function (Router $r): void {
             'senderLabel' => $tenant['senderLabel'],
             'dailyQuota'  => $tenant['dailyQuota'],
             'usedToday'   => (int) Db::value(
-                'SELECT COUNT(*) FROM `sms_messages` WHERE `tenantId` = ? AND `createdAt` >= ?',
+                'SELECT COUNT(*) FROM `otp_sms_messages` WHERE `tenantId` = ? AND `createdAt` >= ?',
                 [$tenant['id'], gmdate('Y-m-d 00:00:00')]
             ),
         ]);

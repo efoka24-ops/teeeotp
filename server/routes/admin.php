@@ -33,19 +33,19 @@ return static function (Router $r): void {
             Http::fail('dailyQuota doit etre compris entre 1 et 100000.', 400);
         }
 
-        if (Db::one('SELECT `id` FROM `tenants` WHERE `slug` = ?', [$slug]) !== null) {
+        if (Db::one('SELECT `id` FROM `otp_tenants` WHERE `slug` = ?', [$slug]) !== null) {
             Http::fail("Le projet '$slug' existe deja. Utilisez POST /v1/projects/$slug/keys.", 409, 'SLUG_ALREADY_USED');
         }
 
         $cle = Auth::generate('sk');
         $tenantId = Db::transaction(static function () use ($name, $slug, $senderLabel, $dailyQuota, $cle): string {
-            $id = Db::insert('tenants', [
+            $id = Db::insert('otp_tenants', [
                 'name'        => $name,
                 'slug'        => $slug,
                 'senderLabel' => $senderLabel,
                 'dailyQuota'  => $dailyQuota,
             ]);
-            Db::insert('api_keys', [
+            Db::insert('otp_api_keys', [
                 'tenantId' => $id,
                 'prefix'   => $cle['prefix'],
                 'hash'     => $cle['hash'],
@@ -69,13 +69,13 @@ return static function (Router $r): void {
     $r->post('/v1/projects/{slug}/keys', static function (array $args): void {
         Auth::requireAdmin();
 
-        $tenant = Db::one('SELECT `id`, `slug` FROM `tenants` WHERE `slug` = ?', [$args['slug']]);
+        $tenant = Db::one('SELECT `id`, `slug` FROM `otp_tenants` WHERE `slug` = ?', [$args['slug']]);
         if ($tenant === null) {
             Http::fail("Projet '{$args['slug']}' introuvable.", 404);
         }
 
         $cle = Auth::generate('sk');
-        Db::insert('api_keys', [
+        Db::insert('otp_api_keys', [
             'tenantId' => $tenant['id'],
             'prefix'   => $cle['prefix'],
             'hash'     => $cle['hash'],
@@ -103,7 +103,7 @@ return static function (Router $r): void {
         }
 
         $jeton = Auth::generate('dv');
-        $id = Db::insert('devices', [
+        $id = Db::insert('otp_devices', [
             'name'        => $name,
             'tokenPrefix' => $jeton['prefix'],
             'tokenHash'   => $jeton['hash'],
@@ -125,11 +125,11 @@ return static function (Router $r): void {
     $r->post('/v1/devices/{id}/active', static function (array $args): void {
         Auth::requireAdmin();
 
-        if (Db::one('SELECT `id` FROM `devices` WHERE `id` = ?', [$args['id']]) === null) {
+        if (Db::one('SELECT `id` FROM `otp_devices` WHERE `id` = ?', [$args['id']]) === null) {
             Http::fail('Telephone introuvable.', 404);
         }
         $active = (bool) Http::input('active', true);
-        Db::update('devices', $args['id'], ['active' => $active ? 1 : 0]);
+        Db::update('otp_devices', $args['id'], ['active' => $active ? 1 : 0]);
         Http::ok(['id' => $args['id'], 'active' => $active]);
     });
 
@@ -153,14 +153,14 @@ return static function (Router $r): void {
                 'appVersion' => $d['appVersion'],
                 'dailyLimit' => (int) $d['dailyLimit'],
                 'sentToday'  => (int) Db::value(
-                    "SELECT COUNT(*) FROM `sms_messages` WHERE `deviceId` = ? AND `status` IN ('sent','delivered') AND `sentAt` >= ?",
+                    "SELECT COUNT(*) FROM `otp_sms_messages` WHERE `deviceId` = ? AND `status` IN ('sent','delivered') AND `sentAt` >= ?",
                     [$d['id'], $dayStart]
                 ),
             ];
-        }, Db::all('SELECT * FROM `devices` ORDER BY `createdAt`'));
+        }, Db::all('SELECT * FROM `otp_devices` ORDER BY `createdAt`'));
 
         $parStatut = [];
-        foreach (Db::all('SELECT `status`, COUNT(*) AS n FROM `sms_messages` WHERE `createdAt` >= ? GROUP BY `status`', [$dayStart]) as $row) {
+        foreach (Db::all('SELECT `status`, COUNT(*) AS n FROM `otp_sms_messages` WHERE `createdAt` >= ? GROUP BY `status`', [$dayStart]) as $row) {
             $parStatut[$row['status']] = (int) $row['n'];
         }
 
@@ -175,7 +175,7 @@ return static function (Router $r): void {
             'createdAt' => Db::iso($s['createdAt']),
             'sentAt'    => Db::iso($s['sentAt']),
         ], Db::all(
-            'SELECT s.*, t.`slug` FROM `sms_messages` s JOIN `tenants` t ON t.`id` = s.`tenantId`
+            'SELECT s.*, t.`slug` FROM `otp_sms_messages` s JOIN `otp_tenants` t ON t.`id` = s.`tenantId`
              ORDER BY s.`createdAt` DESC LIMIT 30'
         ));
 
@@ -183,7 +183,7 @@ return static function (Router $r): void {
             'devices'    => $devices,
             'today'      => $parStatut,
             'globalCap'  => Config::int('GLOBAL_DAILY_CAP', 1000),
-            'projects'   => Db::all('SELECT `slug`, `name`, `senderLabel`, `dailyQuota`, `active` FROM `tenants` ORDER BY `name`'),
+            'projects'   => Db::all('SELECT `slug`, `name`, `senderLabel`, `dailyQuota`, `active` FROM `otp_tenants` ORDER BY `name`'),
             'recent'     => $recents,
         ]);
     });

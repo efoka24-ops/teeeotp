@@ -63,6 +63,8 @@ $otp->sendSms($telephone, 'Votre commande KoliGo est en route.');
 
 ## API
 
+Tables prefixees `otp_` : la base est partagee avec le site trugroup.cm.
+
 Erreurs au format `{ "error": { "code", "message" } }`, comme apisungku.
 
 ### Projets (en-tete `X-Api-Key: sk_…`)

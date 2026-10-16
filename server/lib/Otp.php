@@ -113,7 +113,7 @@ final class Otp
         $row = Db::one(
             'SELECT o.`id`, o.`phone`, o.`purpose`, o.`status`, o.`attemptsLeft`, o.`expiresAt`, o.`verifiedAt`, o.`createdAt`,
                     s.`status` AS smsStatus, s.`sentAt`, s.`deliveredAt`, s.`error` AS smsError
-             FROM `otp_requests` o LEFT JOIN `sms_messages` s ON s.`id` = o.`smsId`
+             FROM `otp_requests` o LEFT JOIN `otp_sms_messages` s ON s.`id` = o.`smsId`
              WHERE o.`id` = ? AND o.`tenantId` = ?',
             [$requestId, $tenant['id']]
         );

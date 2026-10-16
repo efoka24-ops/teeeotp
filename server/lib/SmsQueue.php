@@ -26,7 +26,7 @@ final class SmsQueue
         $dayStart = gmdate('Y-m-d 00:00:00');
 
         $tenantToday = (int) Db::value(
-            'SELECT COUNT(*) FROM `sms_messages` WHERE `tenantId` = ? AND `createdAt` >= ?',
+            'SELECT COUNT(*) FROM `otp_sms_messages` WHERE `tenantId` = ? AND `createdAt` >= ?',
             [$tenant['id'], $dayStart]
         );
         if ($tenantToday >= $tenant['dailyQuota']) {
@@ -34,13 +34,13 @@ final class SmsQueue
         }
 
         $globalCap = Config::int('GLOBAL_DAILY_CAP', 1000);
-        $allToday  = (int) Db::value('SELECT COUNT(*) FROM `sms_messages` WHERE `createdAt` >= ?', [$dayStart]);
+        $allToday  = (int) Db::value('SELECT COUNT(*) FROM `otp_sms_messages` WHERE `createdAt` >= ?', [$dayStart]);
         if ($allToday >= $globalCap) {
             error_log("[sms] plafond global atteint ($globalCap)");
             throw new QuotaExceeded('Capacite journaliere du service atteinte.');
         }
 
-        return Db::insert('sms_messages', [
+        return Db::insert('otp_sms_messages', [
             'tenantId'  => $tenant['id'],
             'kind'      => $kind,
             'phone'     => $phone,
@@ -65,7 +65,7 @@ final class SmsQueue
         $now = Db::now();
 
         Db::run(
-            "UPDATE `sms_messages` SET `status` = 'expired', `updatedAt` = ?
+            "UPDATE `otp_sms_messages` SET `status` = 'expired', `updatedAt` = ?
              WHERE `status` IN ('queued','sending') AND `expiresAt` < ?",
             [$now, $now]
         );
@@ -74,7 +74,7 @@ final class SmsQueue
         // confirme. On le remet en file tant qu'il reste des tentatives.
         $abandon = Db::now(-self::CLAIM_TIMEOUT_SECONDS);
         Db::run(
-            "UPDATE `sms_messages`
+            "UPDATE `otp_sms_messages`
              SET `status` = IF(`attempts` >= ?, 'failed', 'queued'),
                  `error` = IF(`attempts` >= ?, 'aucun compte rendu du telephone', `error`),
                  `claimToken` = NULL, `updatedAt` = ?
@@ -83,7 +83,7 @@ final class SmsQueue
         );
 
         $sentToday = (int) Db::value(
-            "SELECT COUNT(*) FROM `sms_messages`
+            "SELECT COUNT(*) FROM `otp_sms_messages`
              WHERE `deviceId` = ? AND `status` IN ('sending','sent','delivered') AND `claimedAt` >= ?",
             [$device['id'], gmdate('Y-m-d 00:00:00')]
         );
@@ -94,7 +94,7 @@ final class SmsQueue
 
         $token = bin2hex(random_bytes(16));
         Db::run(
-            "UPDATE `sms_messages`
+            "UPDATE `otp_sms_messages`
              SET `status` = 'sending', `claimToken` = ?, `deviceId` = ?, `claimedAt` = ?,
                  `attempts` = `attempts` + 1, `updatedAt` = ?
              WHERE `status` = 'queued' AND `expiresAt` > ?
@@ -104,7 +104,7 @@ final class SmsQueue
         );
 
         return Db::all(
-            'SELECT `id`, `phone`, `body` FROM `sms_messages` WHERE `claimToken` = ? ORDER BY `priority`, `createdAt`',
+            'SELECT `id`, `phone`, `body` FROM `otp_sms_messages` WHERE `claimToken` = ? ORDER BY `priority`, `createdAt`',
             [$token]
         );
     }
@@ -117,7 +117,7 @@ final class SmsQueue
      */
     public static function report(array $device, string $smsId, string $status, ?string $error): bool
     {
-        $sms = Db::one('SELECT `status` FROM `sms_messages` WHERE `id` = ? AND `deviceId` = ?', [$smsId, $device['id']]);
+        $sms = Db::one('SELECT `status` FROM `otp_sms_messages` WHERE `id` = ? AND `deviceId` = ?', [$smsId, $device['id']]);
         if ($sms === null) {
             return false;
         }
@@ -133,11 +133,11 @@ final class SmsQueue
             $data['sentAt'] = $now;
         } elseif ($status === 'delivered') {
             $data['deliveredAt'] = $now;
-            $data['sentAt'] = Db::value('SELECT `sentAt` FROM `sms_messages` WHERE `id` = ?', [$smsId]) ?? $now;
+            $data['sentAt'] = Db::value('SELECT `sentAt` FROM `otp_sms_messages` WHERE `id` = ?', [$smsId]) ?? $now;
         } else {
             $data['error'] = mb_substr((string) ($error ?? 'echec d envoi'), 0, 255);
         }
-        Db::update('sms_messages', $smsId, $data);
+        Db::update('otp_sms_messages', $smsId, $data);
 
         return true;
     }

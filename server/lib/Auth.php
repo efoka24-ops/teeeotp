@@ -61,7 +61,7 @@ final class Auth
         $record = $prefix === null ? null : Db::one(
             'SELECT k.`id` AS keyId, k.`hash`, k.`revokedAt`,
                     t.`id`, t.`name`, t.`slug`, t.`senderLabel`, t.`dailyQuota`, t.`active`
-             FROM `api_keys` k JOIN `tenants` t ON t.`id` = k.`tenantId`
+             FROM `otp_api_keys` k JOIN `otp_tenants` t ON t.`id` = k.`tenantId`
              WHERE k.`prefix` = ?',
             [$prefix]
         );
@@ -76,7 +76,7 @@ final class Auth
         }
 
         try {
-            Db::run('UPDATE `api_keys` SET `lastUsedAt` = ? WHERE `id` = ?', [Db::now(), $record['keyId']]);
+            Db::run('UPDATE `otp_api_keys` SET `lastUsedAt` = ? WHERE `id` = ?', [Db::now(), $record['keyId']]);
         } catch (Throwable $e) {
             error_log('[auth] lastUsedAt non mis a jour : ' . $e->getMessage());
         }
@@ -91,7 +91,7 @@ final class Auth
     {
         $presented = Http::bearer();
         $prefix    = $presented === null ? null : self::prefixOf($presented, 'dv');
-        $device    = $prefix === null ? null : Db::one('SELECT * FROM `devices` WHERE `tokenPrefix` = ?', [$prefix]);
+        $device    = $prefix === null ? null : Db::one('SELECT * FROM `otp_devices` WHERE `tokenPrefix` = ?', [$prefix]);
 
         if (
             $device === null

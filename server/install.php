@@ -8,7 +8,7 @@ declare(strict_types=1);
  *   POST /teeeotp/install.php?token=<INSTALL_TOKEN>
  *
  * A supprimer du serveur juste apres usage, avec schema.sql. Refuse de
- * s'executer si les tables existent deja : ce script ne detruit jamais rien.
+ * s'executer si toutes les tables existent deja : ce script ne detruit jamais rien.
  */
 
 ini_set('display_errors', '0');
@@ -33,13 +33,15 @@ if ($attendu === null || $attendu === '' || !hash_equals($attendu, (string) ($_G
 }
 
 $pdo        = Db::pdo();
-$attendues  = ['tenants', 'api_keys', 'devices', 'otp_requests', 'sms_messages'];
+$attendues  = ['otp_tenants', 'otp_api_keys', 'otp_devices', 'otp_requests', 'otp_sms_messages'];
 $existantes = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
 
-if (array_intersect($attendues, $existantes) !== []) {
+// Le schema ne contient que des CREATE TABLE IF NOT EXISTS : le rejouer
+// complete une installation partielle sans toucher aux tables existantes.
+if (array_diff($attendues, $existantes) === []) {
     Http::ok([
         'status'  => 'already-installed',
-        'tables'  => $existantes,
+        'tables'  => array_values(array_intersect($existantes, $attendues)),
         'message' => 'Les tables existent deja. Aucune action effectuee.',
     ]);
 }

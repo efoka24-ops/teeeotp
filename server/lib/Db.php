@@ -12,7 +12,7 @@ declare(strict_types=1);
 final class Db
 {
     /** Tables portant une colonne `updatedAt`, tenue a jour a chaque ecriture. */
-    private const HORODATEES = ['tenants', 'devices', 'otp_requests', 'sms_messages'];
+    private const HORODATEES = ['otp_tenants', 'otp_devices', 'otp_requests', 'otp_sms_messages'];
 
     private static ?PDO $pdo = null;
 

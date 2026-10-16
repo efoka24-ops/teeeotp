@@ -6,7 +6,7 @@
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- ─── Projets clients (KoliGo, ERP scolaire, Pressing…) ──────────────────────
-CREATE TABLE IF NOT EXISTS `tenants` (
+CREATE TABLE IF NOT EXISTS `otp_tenants` (
   `id`          CHAR(36)     NOT NULL,
   `name`        VARCHAR(120) NOT NULL,
   `slug`        VARCHAR(50)  NOT NULL,
@@ -19,12 +19,12 @@ CREATE TABLE IF NOT EXISTS `tenants` (
   `createdAt`   DATETIME(3)  NOT NULL,
   `updatedAt`   DATETIME(3)  NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `tenants_slug_key` (`slug`)
+  UNIQUE KEY `otp_tenants_slug_key` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─── Cles API des projets ───────────────────────────────────────────────────
 -- Seul le hachage est stocke ; la cle en clair n'est affichee qu'une fois.
-CREATE TABLE IF NOT EXISTS `api_keys` (
+CREATE TABLE IF NOT EXISTS `otp_api_keys` (
   `id`         CHAR(36)    NOT NULL,
   `tenantId`   CHAR(36)    NOT NULL,
   `prefix`     VARCHAR(16) NOT NULL,
@@ -34,15 +34,15 @@ CREATE TABLE IF NOT EXISTS `api_keys` (
   `revokedAt`  DATETIME(3) NULL,
   `createdAt`  DATETIME(3) NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `api_keys_prefix_key` (`prefix`),
-  KEY `api_keys_tenant_idx` (`tenantId`),
-  CONSTRAINT `api_keys_tenant_fk` FOREIGN KEY (`tenantId`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+  UNIQUE KEY `otp_api_keys_prefix_key` (`prefix`),
+  KEY `otp_api_keys_tenant_idx` (`tenantId`),
+  CONSTRAINT `otp_api_keys_tenant_fk` FOREIGN KEY (`tenantId`) REFERENCES `otp_tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─── Telephones passerelles ─────────────────────────────────────────────────
 -- Chaque telephone (une SIM avec forfait SMS) s'authentifie avec son propre
 -- jeton, revocable sans toucher aux autres.
-CREATE TABLE IF NOT EXISTS `devices` (
+CREATE TABLE IF NOT EXISTS `otp_devices` (
   `id`          CHAR(36)     NOT NULL,
   `name`        VARCHAR(60)  NOT NULL,
   `tokenPrefix` VARCHAR(16)  NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS `devices` (
   `createdAt`   DATETIME(3)  NOT NULL,
   `updatedAt`   DATETIME(3)  NOT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `devices_prefix_key` (`tokenPrefix`)
+  UNIQUE KEY `otp_devices_prefix_key` (`tokenPrefix`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─── Demandes d'OTP ─────────────────────────────────────────────────────────
@@ -80,17 +80,17 @@ CREATE TABLE IF NOT EXISTS `otp_requests` (
   PRIMARY KEY (`id`),
   KEY `otp_phone_idx` (`phone`, `createdAt`),
   KEY `otp_tenant_idx` (`tenantId`, `createdAt`),
-  CONSTRAINT `otp_tenant_fk` FOREIGN KEY (`tenantId`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+  CONSTRAINT `otp_tenant_fk` FOREIGN KEY (`tenantId`) REFERENCES `otp_tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─── File des SMS a envoyer par les telephones ──────────────────────────────
-CREATE TABLE IF NOT EXISTS `sms_messages` (
+CREATE TABLE IF NOT EXISTS `otp_sms_messages` (
   `id`          CHAR(36)     NOT NULL,
   `tenantId`    CHAR(36)     NOT NULL,
   `kind`        ENUM('otp','notification') NOT NULL,
   `phone`       VARCHAR(16)  NOT NULL,
   `body`        VARCHAR(480) NOT NULL,
-  -- queued : en attente d'un telephone ; sending : reserve par un telephone ;
+  -- queued : en attente d'un telephone, sending : reserve par un telephone,
   -- sent : accepte par le reseau ; delivered : accuse de reception recu.
   `status`      ENUM('queued','sending','sent','delivered','failed','expired') NOT NULL DEFAULT 'queued',
   `priority`    TINYINT UNSIGNED NOT NULL DEFAULT 5,
@@ -105,11 +105,11 @@ CREATE TABLE IF NOT EXISTS `sms_messages` (
   `createdAt`   DATETIME(3)  NOT NULL,
   `updatedAt`   DATETIME(3)  NOT NULL,
   PRIMARY KEY (`id`),
-  KEY `sms_queue_idx` (`status`, `priority`, `createdAt`),
-  KEY `sms_claim_idx` (`claimToken`),
-  KEY `sms_tenant_idx` (`tenantId`, `createdAt`),
-  KEY `sms_device_idx` (`deviceId`, `sentAt`),
-  CONSTRAINT `sms_tenant_fk` FOREIGN KEY (`tenantId`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+  KEY `otp_sms_queue_idx` (`status`, `priority`, `createdAt`),
+  KEY `otp_sms_claim_idx` (`claimToken`),
+  KEY `otp_sms_tenant_idx` (`tenantId`, `createdAt`),
+  KEY `otp_sms_device_idx` (`deviceId`, `sentAt`),
+  CONSTRAINT `otp_sms_tenant_fk` FOREIGN KEY (`tenantId`) REFERENCES `otp_tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;
