@@ -54,9 +54,13 @@ final class Http
         self::json($data, $status);
     }
 
+    /** Code de la derniere erreur renvoyee, repris par le journal des appels. */
+    public static ?string $lastErrorCode = null;
+
     public static function fail(string $message, int $status = 400, ?string $code = null, array $extra = []): never
     {
         $error = ['code' => $code ?? self::codeFor($status), 'message' => $message] + $extra;
+        self::$lastErrorCode = $error['code'];
         self::json(['error' => $error], $status);
     }
 

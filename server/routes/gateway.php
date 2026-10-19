@@ -25,10 +25,16 @@ return static function (Router $r): void {
             'charging'   => Http::input('charging') === null ? null : (Http::input('charging') ? 1 : 0),
         ]);
 
-        $limit = max(1, min((int) Http::input('limit', 5), 20));
+        $limit    = max(1, min((int) Http::input('limit', 5), 20));
+        $messages = SmsQueue::claim($device, $limit);
+        if ($messages === []) {
+            // Interrogation a vide toutes les 3 s : le signal de vie est deja
+            // dans otp_devices.lastSeenAt, inutile d'en garder une ligne.
+            ApiLog::skip();
+        }
 
         Http::ok([
-            'messages'    => SmsQueue::claim($device, $limit),
+            'messages'    => $messages,
             // Le serveur pilote le rythme d'interrogation : on peut ralentir
             // tous les telephones sans republier l'appli.
             'pollAfterMs' => Config::int('GATEWAY_POLL_MS', 3000),

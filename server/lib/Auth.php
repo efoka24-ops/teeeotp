@@ -66,6 +66,16 @@ final class Auth
             [$prefix]
         );
 
+        // Le prefixe est public : le journaliser, meme en cas d'echec, permet de
+        // voir au back-office qu'un projet appelle avec une cle revoquee ou mal
+        // recopiee.
+        if ($prefix !== null) {
+            ApiLog::keyPrefix("sk_$prefix");
+        }
+        if ($record !== null) {
+            ApiLog::tenant((string) $record['id']);
+        }
+
         if (
             $record === null
             || $record['revokedAt'] !== null
@@ -92,6 +102,9 @@ final class Auth
         $presented = Http::bearer();
         $prefix    = $presented === null ? null : self::prefixOf($presented, 'dv');
         $device    = $prefix === null ? null : Db::one('SELECT * FROM `otp_devices` WHERE `tokenPrefix` = ?', [$prefix]);
+        if ($device !== null) {
+            ApiLog::device((string) $device['id']);
+        }
 
         if (
             $device === null
@@ -111,6 +124,7 @@ final class Auth
      */
     public static function requireAdmin(): void
     {
+        ApiLog::admin();
         $expected = Config::get('ADMIN_API_KEY', '');
         if ($expected === null || $expected === '') {
             Http::fail("Administration desactivee : ADMIN_API_KEY n'est pas definie.", 503, 'ADMIN_KEY_NOT_CONFIGURED');

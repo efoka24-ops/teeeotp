@@ -33,7 +33,7 @@ if ($attendu === null || $attendu === '' || !hash_equals($attendu, (string) ($_G
 }
 
 $pdo        = Db::pdo();
-$attendues  = ['otp_tenants', 'otp_api_keys', 'otp_devices', 'otp_requests', 'otp_sms_messages'];
+$attendues  = ['otp_tenants', 'otp_api_keys', 'otp_devices', 'otp_requests', 'otp_sms_messages', 'otp_api_logs'];
 $existantes = $pdo->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
 
 // Le schema ne contient que des CREATE TABLE IF NOT EXISTS : le rejouer

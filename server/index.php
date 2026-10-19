@@ -26,10 +26,13 @@ require __DIR__ . '/lib/Auth.php';
 require __DIR__ . '/lib/Phone.php';
 require __DIR__ . '/lib/SmsQueue.php';
 require __DIR__ . '/lib/Otp.php';
+require __DIR__ . '/lib/ApiLog.php';
+require __DIR__ . '/lib/Migrations.php';
 require __DIR__ . '/lib/Router.php';
 
 Config::boot(__DIR__);
 date_default_timezone_set('UTC');
+ApiLog::start();
 
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
@@ -47,7 +50,7 @@ if (Http::method() === 'OPTIONS') {
 $path = '/' . trim((string) ($_GET['__path'] ?? ''), '/');
 
 $router = new Router();
-foreach (['otp', 'gateway', 'admin'] as $groupe) {
+foreach (['otp', 'gateway', 'admin', 'backoffice'] as $groupe) {
     (require __DIR__ . "/routes/$groupe.php")($router);
 }
 

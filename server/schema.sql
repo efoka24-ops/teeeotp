@@ -112,4 +112,25 @@ CREATE TABLE IF NOT EXISTS `otp_sms_messages` (
   CONSTRAINT `otp_sms_tenant_fk` FOREIGN KEY (`tenantId`) REFERENCES `otp_tenants` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ─── Journal des appels API (back-office) ───────────────────────────────────
+-- Une ligne par appel, sans secret ni contenu de message. Purge a 30 jours.
+CREATE TABLE IF NOT EXISTS `otp_api_logs` (
+  `id`         CHAR(36)     NOT NULL,
+  `actor`      ENUM('project','device','admin','anonymous') NOT NULL,
+  `tenantId`   CHAR(36)     NULL,
+  `deviceId`   CHAR(36)     NULL,
+  `keyPrefix`  VARCHAR(16)  NULL,
+  `method`     VARCHAR(8)   NOT NULL,
+  `path`       VARCHAR(120) NOT NULL,
+  `status`     SMALLINT UNSIGNED NOT NULL,
+  `errorCode`  VARCHAR(40)  NULL,
+  `durationMs` INT UNSIGNED NOT NULL,
+  `ip`         VARCHAR(45)  NULL,
+  `createdAt`  DATETIME(3)  NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `otp_api_logs_created_idx` (`createdAt`),
+  KEY `otp_api_logs_tenant_idx` (`tenantId`, `createdAt`),
+  KEY `otp_api_logs_status_idx` (`status`, `createdAt`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
