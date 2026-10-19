@@ -623,7 +623,17 @@ $('#loginBtn').addEventListener('click', () => login($('#key').value.trim()));
 $('#key').addEventListener('keydown', e => { if (e.key === 'Enter') login($('#key').value.trim()); });
 $('#logout').addEventListener('click', () => logout());
 
-const saved = store(true);
+// Lien personnel : <base>/admin/#k=<cle> connecte directement, sans ecran de
+// saisie. Le fragment (#) n'est jamais envoye au serveur ni journalise ; il est
+// efface de la barre d'adresse des la lecture.
+const fromLink = new URLSearchParams(location.hash.slice(1)).get('k');
+if (fromLink) {
+  history.replaceState(null, '', location.pathname);
+  // Rester connecte : le lien n'a servi qu'une fois, les visites suivantes
+  // passent par /admin/ directement.
+  $('#remember').checked = true;
+}
+const saved = fromLink || store(true);
 if (saved) login(saved); else $('#login').classList.remove('hidden');
 })();
 </script>
