@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">teeeotp passerelle</string>
+    <string name="intro">Ce telephone envoie les codes OTP et les SMS des projets TRU GROUP avec sa SIM. Laissez-le branche et connecte.</string>
+    <string name="server_url">URL du serveur</string>
+    <string name="device_token">Jeton du telephone</string>
+    <string name="battery">Exempter de l\'optimisation de batterie</string>
+</resources>

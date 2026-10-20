@@ -1,0 +1,726 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>teeeotp — back-office</title>
+<style>
+:root{
+  --bg:#f5f6f8;--panel:#fff;--ink:#16181d;--muted:#6b7280;--line:#e4e7ec;
+  --accent:#1f6feb;--ok:#15803d;--okbg:#e7f6ec;--warn:#b45309;--warnbg:#fdf3e1;
+  --bad:#b91c1c;--badbg:#fdecec;--pend:#6d28d9;--pendbg:#f1ebfd;--code:#f2f4f7;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f1115;--panel:#171a21;--ink:#e6e8ec;--muted:#9aa3b2;--line:#272b35;
+  --accent:#4c8dff;--ok:#4ade80;--okbg:#12291b;--warn:#fbbf24;--warnbg:#2c2210;
+  --bad:#f87171;--badbg:#2e1515;--pend:#a78bfa;--pendbg:#221a35;--code:#1f232c;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:12px 20px;background:var(--panel);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:650}
+header h1 span{color:var(--muted);font-weight:400}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:none;border:0;padding:7px 12px;border-radius:7px;color:var(--muted);cursor:pointer;font:inherit}
+nav button.on{background:var(--code);color:var(--ink);font-weight:600}
+.spacer{flex:1}
+main{padding:20px;max-width:1280px;margin:auto}
+h2{font-size:15px;margin:22px 0 10px}
+h2:first-child{margin-top:0}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.kpi .v{font-size:24px;font-weight:650;font-variant-numeric:tabular-nums}
+.kpi .l{color:var(--muted);font-size:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:12px;background:var(--panel);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--code)}
+td.wrap{white-space:normal;min-width:220px}
+.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12px}
+.muted{color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:550}
+.p-ok{background:var(--okbg);color:var(--ok)}.p-bad{background:var(--badbg);color:var(--bad)}
+.p-warn{background:var(--warnbg);color:var(--warn)}.p-pend{background:var(--pendbg);color:var(--pend)}
+.p-mute{background:var(--code);color:var(--muted)}
+.bar{height:6px;background:var(--code);border-radius:3px;overflow:hidden;min-width:80px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.bar i.hot{background:var(--warn)}.bar i.full{background:var(--bad)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:7px 9px}
+textarea{width:100%;min-height:70px}
+button.b{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;padding:7px 12px;cursor:pointer}
+button.b:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:var(--bad)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>*{flex:1;min-width:260px}
+label.f{display:block;margin-bottom:10px}
+label.f span{display:block;color:var(--muted);font-size:12px;margin-bottom:3px}
+label.f input,label.f select{width:100%}
+.secret{background:var(--warnbg);border:1px solid var(--warn);border-radius:8px;padding:12px;margin:10px 0}
+.secret code{word-break:break-all;display:block;margin:6px 0;font-size:13px}
+pre{background:var(--code);padding:12px;border-radius:8px;overflow:auto;font-size:12px;margin:0}
+.chart{display:flex;align-items:flex-end;gap:4px;height:120px;padding-top:8px}
+.chart .col{flex:1;display:flex;flex-direction:column-reverse;min-width:0;height:100%}
+.chart .col i{display:block;width:100%}
+.chart .x{display:flex;gap:4px;font-size:10px;color:var(--muted)}
+.chart .x span{flex:1;text-align:center;overflow:hidden}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.empty{padding:24px;text-align:center;color:var(--muted)}
+#login{max-width:420px;margin:12vh auto;padding:0 16px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;display:none;z-index:9;max-width:90vw}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.hidden{display:none!important}
+@media (max-width:640px){main{padding:12px}header{padding:10px 12px}}
+</style>
+</head>
+<body>
+
+<div id="login" class="hidden">
+  <div class="card">
+    <h1 style="font-size:18px;margin:0 0 6px">teeeotp — back-office</h1>
+    <p class="muted" style="margin:0 0 14px">Saisissez la cle d'administration (<span class="mono">ADMIN_API_KEY</span> du fichier <span class="mono">teeeotp.env</span>).</p>
+    <label class="f"><span>Cle d'administration</span><input id="key" type="password" autocomplete="off"></label>
+    <label style="display:flex;gap:6px;align-items:center;margin-bottom:12px"><input type="checkbox" id="remember"> Rester connecte sur cet appareil</label>
+    <button class="b primary" id="loginBtn" style="width:100%">Se connecter</button>
+    <p id="loginErr" style="color:var(--bad)"></p>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>teeeotp <span>back-office</span></h1>
+    <nav id="tabs">
+      <button data-tab="overview" class="on">Vue d'ensemble</button>
+      <button data-tab="projects">Integrations</button>
+      <button data-tab="access">Demandes d'acces <span id="accessBadge" class="pill p-bad hidden"></span></button>
+      <button data-tab="logs">Journal API</button>
+      <button data-tab="sms">SMS</button>
+      <button data-tab="devices">Telephones</button>
+      <button data-tab="tools">Outils</button>
+    </nav>
+    <div class="spacer"></div>
+    <label class="muted" style="font-size:12px"><input type="checkbox" id="auto" checked> actualisation auto</label>
+    <button class="b" id="logout">Deconnexion</button>
+  </header>
+  <main id="view"></main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+// Le back-office est servi depuis <base>/admin/ : l'API est a <base>/v1.
+const BASE = location.pathname.replace(/\/admin(\/.*)?$/, '');
+const TZ = 'Africa/Douala';
+let KEY = null;
+let tab = 'overview';
+let timer = null;
+const state = { project: null, logs: [], sms: [] };
+
+// ─── Utilitaires ──────────────────────────────────────────────────────────
+const $ = (s, el = document) => el.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = n => Number(n || 0).toLocaleString('fr-FR');
+const dt = iso => iso ? new Date(iso).toLocaleString('fr-FR', {timeZone: TZ, day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit'}) : '—';
+function ago(iso) {
+  if (!iso) return 'jamais';
+  const s = Math.round((Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return `il y a ${s} s`;
+  if (s < 3600) return `il y a ${Math.round(s / 60)} min`;
+  if (s < 86400) return `il y a ${Math.round(s / 3600)} h`;
+  return `il y a ${Math.round(s / 86400)} j`;
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 3500);
+}
+function store(get, val) {
+  try {
+    if (get) return sessionStorage.getItem('teeeotp.key') || localStorage.getItem('teeeotp.key');
+    sessionStorage.removeItem('teeeotp.key'); localStorage.removeItem('teeeotp.key');
+    if (val) (($('#remember') || {}).checked ? localStorage : sessionStorage).setItem('teeeotp.key', val);
+  } catch (e) { return null; }
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(BASE + path, {
+    method: opts.method || 'GET',
+    headers: {'X-Admin-Key': KEY, 'Content-Type': 'application/json', 'Accept': 'application/json'},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) {}
+  if (res.status === 403 || res.status === 401) { logout('Cle refusee.'); throw new Error('auth'); }
+  if (!res.ok) throw new Error(data.error ? `${data.error.code} : ${data.error.message}` : `HTTP ${res.status}`);
+  return data;
+}
+
+// ─── Lecture des statuts ──────────────────────────────────────────────────
+const SMS_PILL = {queued:['en file','p-pend'], sending:['en cours','p-pend'], sent:['envoye','p-ok'], delivered:['livre','p-ok'], failed:['echec','p-bad'], expired:['expire','p-warn']};
+const smsPill = s => { const [l, c] = SMS_PILL[s] || [s, 'p-mute']; return `<span class="pill ${c}">${esc(l)}</span>`; };
+const httpPill = s => `<span class="pill ${s >= 500 ? 'p-bad' : s >= 400 ? 'p-warn' : 'p-ok'}">${esc(s)}</span>`;
+const ACTOR = {project:'projet', device:'telephone', admin:'admin', anonymous:'anonyme'};
+
+// Ce que chaque code d'erreur veut dire pour l'equipe qui integre.
+const HINT = {
+  UNAUTHORIZED: "Cle absente, mal recopiee, revoquee ou projet desactive. Verifier l'en-tete X-Api-Key.",
+  FORBIDDEN: "Cle d'administration invalide.",
+  INVALID_PHONE: 'Le numero n est pas un mobile camerounais (6XXXXXXXX).',
+  INVALID_REQUEST: 'Champ manquant ou mal forme dans le corps JSON.',
+  TOO_MANY_REQUESTS: 'Trop de codes demandes pour ce numero (3 par 15 min).',
+  QUOTA_EXCEEDED: 'Quota journalier du projet ou capacite globale atteint.',
+  NOT_FOUND: 'Route ou ressource inconnue : verifier l URL (prefixe /v1).',
+  METHOD_NOT_ALLOWED: 'Mauvaise methode HTTP (POST attendu ?).',
+  SERVICE_UNAVAILABLE: 'Base de donnees injoignable.',
+  INTERNAL_ERROR: 'Erreur serveur : consulter le journal PHP.',
+  MISCONFIGURED: 'Variable obligatoire absente de teeeotp.env.',
+};
+const hint = c => HINT[c] ? `<span class="muted">${esc(HINT[c])}</span>` : '';
+const testPill = t => t ? ' <span class="pill p-warn">TEST</span>' : '';
+const modePill = p => p.liveKeys ? '<span class="pill p-ok">production</span>' : '<span class="pill p-warn">test seulement</span>';
+function badge(n) {
+  const b = $('#accessBadge'); if (!b) return;
+  b.textContent = n; b.classList.toggle('hidden', !n);
+}
+
+function quotaBar(used, quota) {
+  const p = quota ? Math.min(100, Math.round(used / quota * 100)) : 0;
+  return `<div class="bar" title="${num(used)} / ${num(quota)}"><i class="${p >= 100 ? 'full' : p >= 80 ? 'hot' : ''}" style="width:${p}%"></i></div>`;
+}
+
+// ─── Vues ─────────────────────────────────────────────────────────────────
+const views = {
+
+  async overview() {
+    const d = await api('/v1/admin/overview');
+    badge(d.pendingAccess);
+    const s = d.smsToday;
+    const sent = s.sent + s.delivered;
+    const max = Math.max(1, ...d.series.map(x => x.ok + x.failed + x.pending));
+    const C = {ok:'var(--ok)', failed:'var(--bad)', pending:'var(--pend)'};
+
+    return `
+    <div class="grid">
+      ${kpi(num(sent), "SMS envoyes aujourd'hui", `${num(s.delivered)} livres`)}
+      ${kpi(num(s.failed + s.expired), 'Echecs / expires', s.failed + s.expired ? 'voir onglet SMS' : '')}
+      ${kpi(num(s.queued + s.sending), 'En attente', '')}
+      ${kpi(`${num(Object.values(s).reduce((a, b) => a + b, 0))} / ${num(d.globalCap)}`, 'Plafond global du jour', '')}
+      ${kpi(num(d.api24h.calls), 'Appels API (24 h)', `${d.api24h.avgMs} ms en moyenne`)}
+      ${kpi(num(d.api24h.errors), 'Appels en erreur (24 h)', '', d.api24h.errors ? 'var(--bad)' : '')}
+    </div>
+
+    ${d.pendingAccess ? `<div class="secret" style="margin-top:12px"><b>${d.pendingAccess} demande(s) d'acces en attente.</b> <button class="b" data-goto="access">Examiner</button></div>` : ''}
+
+    <h2>Telephones passerelles</h2>
+    <div class="grid">${d.devices.map(deviceCard).join('') || '<div class="card muted">Aucun telephone enrole.</div>'}</div>
+
+    <h2>SMS des 14 derniers jours</h2>
+    <div class="card">
+      <div class="chart">${d.series.map(x => `<div class="col" title="${esc(x.day)} : ${x.ok} envoyes, ${x.failed} echecs, ${x.pending} en attente">
+        ${['ok','failed','pending'].map(k => x[k] ? `<i style="height:${x[k] / max * 100}%;background:${C[k]}"></i>` : '').join('')}</div>`).join('')}</div>
+      <div class="chart x">${d.series.map(x => `<span>${esc(x.day.slice(8))}</span>`).join('')}</div>
+      <div class="legend"><span><i style="background:var(--ok)"></i>envoyes</span><span><i style="background:var(--bad)"></i>echecs / expires</span><span><i style="background:var(--pend)"></i>en attente</span></div>
+    </div>
+
+    <h2>Integrations</h2>
+    <div class="panel scroll"><table>
+      <tr><th>Projet</th><th>Etat</th><th>Mode</th><th>SMS du jour</th><th></th><th>Appels 24 h</th><th>Erreurs 24 h</th><th>Dernier appel</th><th>Derniere erreur</th></tr>
+      ${d.projects.map(p => `<tr class="click" data-project="${esc(p.slug)}">
+        <td><b>${esc(p.name)}</b><br><span class="muted mono">${esc(p.slug)}</span></td>
+        <td>${p.active ? '<span class="pill p-ok">actif</span>' : '<span class="pill p-bad">suspendu</span>'}</td>
+        <td>${modePill(p)}<br><span class="muted" style="font-size:12px">test : ${p.testSms.used}/${p.testSms.limit} SMS</span></td>
+        <td>${num(p.usedToday)} / ${num(p.dailyQuota)}</td><td>${quotaBar(p.usedToday, p.dailyQuota)}</td>
+        <td>${num(p.calls24h)}</td>
+        <td>${p.errors24h ? `<span class="pill p-bad">${num(p.errors24h)}</span>` : '0'}</td>
+        <td title="${esc(dt(p.lastCallAt))}">${p.lastCallAt ? esc(ago(p.lastCallAt)) : '<span class="pill p-warn">aucun appel</span>'}</td>
+        <td class="wrap">${p.lastError ? `${httpPill(p.lastError.status)} <span class="mono">${esc(p.lastError.code || '')}</span> <span class="muted">${esc(ago(p.lastError.at))}</span>` : '<span class="muted">—</span>'}</td>
+      </tr>`).join('')}
+    </table></div>
+
+    <h2>Dernieres erreurs</h2>
+    ${logTable(d.recentErrors, true)}`;
+  },
+
+  async projects() {
+    if (state.project) return projectDetail(state.project);
+    const d = await api('/v1/admin/overview');
+    return `
+    <div class="row">
+      <div>
+        <h2>Projets integres</h2>
+        <div class="panel scroll"><table>
+          <tr><th>Projet</th><th>Etat</th><th>Mode</th><th>Quota du jour</th><th>Dernier appel</th><th>Erreurs 24 h</th></tr>
+          ${d.projects.map(p => `<tr class="click" data-project="${esc(p.slug)}">
+            <td><b>${esc(p.name)}</b> <span class="muted mono">${esc(p.slug)}</span>${p.origin === 'self-service' ? ' <span class="pill p-mute">libre-service</span>' : ''}</td>
+            <td>${p.active ? '<span class="pill p-ok">actif</span>' : '<span class="pill p-bad">suspendu</span>'}</td>
+            <td>${modePill(p)}</td>
+            <td>${quotaBar(p.usedToday, p.dailyQuota)} <span class="muted">${num(p.usedToday)} / ${num(p.dailyQuota)}</span></td>
+            <td>${p.lastCallAt ? esc(ago(p.lastCallAt)) : '<span class="pill p-warn">aucun appel</span>'}</td>
+            <td>${p.errors24h ? `<span class="pill p-bad">${num(p.errors24h)}</span>` : '0'}</td>
+          </tr>`).join('')}
+        </table></div>
+      </div>
+      <div style="max-width:380px">
+        <h2>Nouveau projet</h2>
+        <div class="card">
+          <label class="f"><span>Nom</span><input id="np-name" placeholder="Scholaris ERP"></label>
+          <label class="f"><span>Identifiant (slug)</span><input id="np-slug" placeholder="scholariserp"></label>
+          <label class="f"><span>Nom affiche dans le SMS (sans accent)</span><input id="np-label" placeholder="Scholaris"></label>
+          <label class="f"><span>Quota de SMS par jour (production)</span><input id="np-quota" type="number" value="500" min="1"></label>
+          <label class="f"><span>Vrais SMS autorises avec la cle de test</span><input id="np-test" type="number" value="5" min="0"></label>
+          <button class="b primary" data-act="create-project">Creer et generer les cles</button>
+          <div id="np-out"></div>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  async access() {
+    const d = await api('/v1/admin/access-requests');
+    badge(d.items.filter(a => a.status === 'pending').length);
+    if (!d.items.length) return `<div class="panel empty">Aucune demande. Le formulaire public est sur <a href="${esc(BASE)}/docs/#acces" target="_blank">la documentation</a>.</div>`;
+    const ST = {pending: ['en attente', 'p-pend'], approved: ['validee', 'p-ok'], rejected: ['refusee', 'p-bad']};
+    return `
+    <p class="muted">Une demande validee cree un projet avec une cle de <b>test</b> seulement (vrais SMS limites, puis simulation).
+      Le demandeur recupere sa cle sur sa page de suivi ; elle est chiffree jusque-la et n'est affichee qu'une fois.</p>
+    ${d.items.map(a => `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <b style="font-size:15px">${esc(a.projectName)}</b> <span class="pill ${ST[a.status][1]}">${ST[a.status][0]}</span>
+        ${a.project ? `<span class="click mono" data-goto-project="${esc(a.project)}" style="cursor:pointer;color:var(--accent)">${esc(a.project)} →</span>` : ''}
+        <span class="spacer"></span><span class="muted">${esc(dt(a.createdAt))}</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div><span class="muted">Contact</span><br>${esc(a.contactName)}${a.company ? ` — ${esc(a.company)}` : ''}<br>
+          <span class="mono">${esc(a.email)}</span><br><span class="mono">${esc(a.phone)}</span><br><span class="muted mono" style="font-size:11px">IP ${esc(a.ip || '')}</span></div>
+        <div class="wrap"><span class="muted">Usage prevu</span><br>${esc(a.useCase)}</div>
+      </div>
+      ${a.status === 'pending' ? `
+      <div class="filters" style="margin-top:12px">
+        <input data-ar="${esc(a.id)}" name="slug" placeholder="slug (auto si vide)">
+        <input data-ar="${esc(a.id)}" name="senderLabel" placeholder="nom dans le SMS" maxlength="30">
+        <label class="muted">SMS de test <input data-ar="${esc(a.id)}" name="testSmsLimit" type="number" min="0" value="5" style="width:70px"></label>
+        <input data-ar="${esc(a.id)}" name="note" placeholder="note au demandeur (facultatif)" style="flex:1;min-width:200px">
+        <button class="b primary" data-act="approve" data-id="${esc(a.id)}">Valider</button>
+        <button class="b danger" data-act="reject" data-id="${esc(a.id)}">Refuser</button>
+      </div>` : `
+      <p class="muted" style="margin:10px 0 0">${a.status === 'approved' ? (a.keyPending ? 'Cle pas encore recuperee par le demandeur.' : `Cle recuperee ${esc(ago(a.keyRetrievedAt))}.`) : ''}
+        ${a.decisionNote ? `Note : ${esc(a.decisionNote)}` : ''}</p>`}
+    </div>`).join('')}`;
+  },
+
+  async logs() {
+    const q = new URLSearchParams(filters('lf'));
+    const d = await api('/v1/admin/logs?' + q);
+    state.logs = d.items;
+    const projects = (await api('/v1/admin/overview')).projects;
+    return `
+    <div class="filters">
+      <select data-f="lf" name="project"><option value="">Tous les projets</option>${projects.map(p => opt(p.slug, p.name, 'lf', 'project')).join('')}</select>
+      <select data-f="lf" name="actor"><option value="">Tous les appelants</option>${Object.entries(ACTOR).map(([k, v]) => opt(k, v, 'lf', 'actor')).join('')}</select>
+      <select data-f="lf" name="status"><option value="">Tous les statuts</option>${[['ok','succes'],['error','erreurs'],['4xx','4xx'],['5xx','5xx']].map(([k, v]) => opt(k, v, 'lf', 'status')).join('')}</select>
+      <input data-f="lf" name="path" placeholder="chemin (ex. otp/send)" value="${esc(filt.lf.path || '')}">
+      <button class="b" data-act="refresh">Filtrer</button>
+    </div>
+    ${logTable(d.items)}
+    ${d.items.length >= 100 ? '<p><button class="b" data-act="more-logs">Charger plus</button></p>' : ''}
+    <p class="muted" style="font-size:12px">Conservation : 30 jours. Les interrogations a vide des telephones et les lectures du back-office ne sont pas journalisees.</p>`;
+  },
+
+  async sms() {
+    const q = new URLSearchParams(filters('sf'));
+    const d = await api('/v1/admin/sms?' + q);
+    state.sms = d.items;
+    const projects = (await api('/v1/admin/overview')).projects;
+    return `
+    <div class="filters">
+      <select data-f="sf" name="project"><option value="">Tous les projets</option>${projects.map(p => opt(p.slug, p.name, 'sf', 'project')).join('')}</select>
+      <select data-f="sf" name="status"><option value="">Tous les statuts</option>${Object.entries(SMS_PILL).map(([k, [v]]) => opt(k, v, 'sf', 'status')).join('')}</select>
+      <select data-f="sf" name="kind"><option value="">OTP et notifications</option>${opt('otp', 'OTP', 'sf', 'kind')}${opt('notification', 'notifications', 'sf', 'kind')}</select>
+      <input data-f="sf" name="phone" placeholder="numero" value="${esc(filt.sf.phone || '')}">
+      <button class="b" data-act="refresh">Filtrer</button>
+    </div>
+    ${smsTable(d.items)}
+    ${d.items.length >= 100 ? '<p><button class="b" data-act="more-sms">Charger plus</button></p>' : ''}`;
+  },
+
+  async devices() {
+    const d = await api('/v1/admin/devices');
+    return `
+    <div class="row">
+      <div>
+        <h2>Telephones passerelles</h2>
+        <div class="panel scroll"><table>
+          <tr><th>Telephone</th><th>Etat</th><th>Dernier contact</th><th>Batterie</th><th>Envoyes / limite du jour</th><th>Echecs</th><th>Appli</th><th></th></tr>
+          ${d.items.map(x => `<tr>
+            <td><b>${esc(x.name)}</b><br><span class="muted mono">${esc(x.id.slice(0, 8))}</span></td>
+            <td>${!x.active ? '<span class="pill p-mute">desactive</span>' : x.online ? '<span class="pill p-ok">en ligne</span>' : '<span class="pill p-bad">hors ligne</span>'}</td>
+            <td title="${esc(dt(x.lastSeenAt))}">${esc(ago(x.lastSeenAt))}<br><span class="muted mono">${esc(x.lastIp || '')}</span></td>
+            <td>${x.battery == null ? '—' : `${x.battery} %`} ${x.charging ? '⚡' : ''}</td>
+            <td>${num(x.sentToday)} / <input type="number" min="1" value="${x.dailyLimit}" data-limit="${esc(x.id)}" style="width:80px"> ${quotaBar(x.sentToday, x.dailyLimit)}</td>
+            <td>${x.failedToday ? `<span class="pill p-bad">${x.failedToday}</span>` : '0'}</td>
+            <td class="mono">${esc(x.appVersion || '—')}</td>
+            <td><button class="b ${x.active ? 'danger' : ''}" data-act="device-toggle" data-id="${esc(x.id)}" data-active="${x.active ? 0 : 1}">${x.active ? 'Desactiver' : 'Reactiver'}</button></td>
+          </tr>`).join('') || '<tr><td colspan="8" class="empty">Aucun telephone.</td></tr>'}
+        </table></div>
+      </div>
+      <div style="max-width:380px">
+        <h2>Enroler un telephone</h2>
+        <div class="card">
+          <label class="f"><span>Nom</span><input id="nd-name" placeholder="Tecno SIM MTN 2"></label>
+          <label class="f"><span>Limite de SMS par jour (protege la SIM)</span><input id="nd-limit" type="number" value="300" min="1"></label>
+          <button class="b primary" data-act="create-device">Generer le jeton</button>
+          <div id="nd-out"></div>
+        </div>
+      </div>
+    </div>`;
+  },
+
+  async tools() {
+    const d = await api('/v1/admin/overview');
+    return `
+    <div class="row">
+      <div class="card">
+        <h2>Envoyer un SMS de test</h2>
+        <p class="muted">Passe par la meme file que les projets, au nom du projet choisi (compte dans son quota).</p>
+        <label class="f"><span>Projet</span><select id="ts-project">${d.projects.map(p => `<option value="${esc(p.slug)}">${esc(p.name)}</option>`).join('')}</select></label>
+        <label class="f"><span>Numero</span><input id="ts-phone" placeholder="6XXXXXXXX"></label>
+        <label class="f"><span>Message (facultatif)</span><textarea id="ts-msg" maxlength="480" placeholder="Laisser vide pour le message de test par defaut"></textarea></label>
+        <button class="b primary" data-act="test-sms">Envoyer</button>
+        <div id="ts-out" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h2>Maintenance</h2>
+        <p class="muted">Cree les tables ajoutees depuis l'installation (journal des appels…). Sans effet si elles existent deja.</p>
+        <button class="b" data-act="migrate">Mettre a jour le schema</button>
+        <h2>Integrer un projet</h2>
+        <p class="muted">Documentation publique a partager : <a href="${esc(BASE)}/docs/" target="_blank">${esc(location.origin + BASE)}/docs/</a>.
+          Client PHP a copier : <span class="mono">clients/php/TeeeOtpClient.php</span> du depot.</p>
+        <pre>$otp = new TeeeOtpClient('${esc(location.origin + BASE)}', getenv('TEEEOTP_API_KEY'));
+
+// Envoyer un code
+$r = $otp->sendOtp('690000000', 'signup');
+$_SESSION['otp'] = $r['requestId'];
+
+// Verifier
+$ok = $otp->verifyOtp($_SESSION['otp'], $_POST['code'])['valid'];
+
+// SMS simple
+$otp->sendSms('690000000', 'Votre commande est prete.');</pre>
+      </div>
+    </div>`;
+  },
+};
+
+async function projectDetail(slug) {
+  const p = await api('/v1/admin/projects/' + encodeURIComponent(slug));
+  const calls = p.endpoints7d.reduce((a, e) => a + e.calls, 0);
+  return `
+  <p><button class="b" data-act="back">← Tous les projets</button></p>
+  <div class="row">
+    <div class="card">
+      <h2 style="margin-top:0">${esc(p.name)} <span class="muted mono">${esc(p.slug)}</span></h2>
+      <label class="f"><span>Nom affiche dans le SMS</span><input id="pe-label" value="${esc(p.senderLabel)}"></label>
+      <label class="f"><span>Quota de SMS par jour</span><input id="pe-quota" type="number" min="1" value="${p.dailyQuota}"></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="b primary" data-act="save-project">Enregistrer</button>
+        <button class="b ${p.active ? 'danger' : ''}" data-act="toggle-project" data-active="${p.active ? 0 : 1}">${p.active ? 'Suspendre le projet' : 'Reactiver le projet'}</button>
+      </div>
+      <p class="muted" style="font-size:12px">Cree le ${esc(dt(p.createdAt))}${p.origin === 'self-service' ? ' en libre-service' : ''}. Un projet suspendu recoit 401 sur tous ses appels.</p>
+      ${p.contact && (p.contact.name || p.contact.email) ? `<p style="font-size:13px"><span class="muted">Contact :</span> ${esc(p.contact.name || '')} <span class="mono">${esc(p.contact.email || '')}</span> <span class="mono">${esc(p.contact.phone || '')}</span></p>` : ''}
+      <h2>Mode test</h2>
+      <p style="margin:0 0 8px">${p.testSms.used} / ${p.testSms.limit} vrais SMS utilises ${quotaBar(p.testSms.used, p.testSms.limit)}</p>
+      <p class="muted" style="font-size:12px;margin:0 0 8px">Au-dela, la cle de test continue de repondre mais simule l'envoi (le code est renvoye dans la reponse).</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="pe-test" type="number" min="0" value="${p.testSms.limit}" style="width:90px">
+        <button class="b" data-act="save-test">Changer la limite</button>
+        <button class="b" data-act="reset-test">Remettre a zero</button>
+      </div>
+    </div>
+    <div class="grid" style="align-content:start">
+      ${kpi(num(calls), 'Appels (7 j)', '')}
+      ${kpi(num(p.otp7d.requested), 'OTP demandes (7 j)', '')}
+      ${kpi(p.otp7d.requested ? Math.round(p.otp7d.verified / p.otp7d.requested * 100) + ' %' : '—', 'Taux de verification', `${num(p.otp7d.verified)} verifies`)}
+      ${kpi(num(p.otp7d.blocked), 'Bloques (trop d essais)', '')}
+    </div>
+  </div>
+
+  <h2>Cles API</h2>
+  <div class="panel scroll"><table>
+    <tr><th>Cle</th><th>Type</th><th>Libelle</th><th>Creee</th><th>Derniere utilisation</th><th>Etat</th><th></th></tr>
+    ${p.keys.map(k => `<tr>
+      <td class="mono">sk_…${esc(k.prefix)}_…</td>
+      <td>${k.env === 'test' ? '<span class="pill p-warn">test</span>' : '<span class="pill p-ok">production</span>'}</td>
+      <td>${esc(k.label || '')}</td><td>${esc(dt(k.createdAt))}</td>
+      <td>${k.lastUsedAt ? esc(ago(k.lastUsedAt)) : '<span class="pill p-warn">jamais utilisee</span>'}</td>
+      <td>${k.revokedAt ? `<span class="pill p-bad">revoquee</span>` : '<span class="pill p-ok">active</span>'}</td>
+      <td>${k.revokedAt ? '' : `<button class="b danger" data-act="revoke" data-id="${esc(k.id)}">Revoquer</button>`}</td>
+    </tr>`).join('')}
+  </table></div>
+  <p><button class="b" data-act="new-key" data-env="live">Nouvelle cle de production</button>
+     <button class="b" data-act="new-key" data-env="test">Nouvelle cle de test</button>
+     <span class="muted">Les anciennes restent actives jusqu'a revocation : rotation sans coupure.</span></p>
+  <div id="pk-out"></div>
+
+  <div class="row">
+    <div>
+      <h2>Utilisation par route (7 j)</h2>
+      <div class="panel scroll"><table>
+        <tr><th>Route</th><th>Appels</th><th>Erreurs</th><th>Temps moyen</th><th>Dernier</th></tr>
+        ${p.endpoints7d.map(e => `<tr><td class="mono">${esc(e.method)} ${esc(e.path)}</td><td>${num(e.calls)}</td>
+          <td>${e.errors ? `<span class="pill p-bad">${num(e.errors)}</span>` : '0'}</td><td>${e.avgMs} ms</td><td>${esc(ago(e.lastAt))}</td></tr>`).join('')
+          || '<tr><td colspan="5" class="empty">Aucun appel sur 7 jours. Le projet n a sans doute pas encore la cle, ou ne l envoie pas.</td></tr>'}
+      </table></div>
+    </div>
+    <div>
+      <h2>Erreurs (7 j)</h2>
+      <div class="panel scroll"><table>
+        <tr><th>Code</th><th>Nombre</th><th>Signification</th></tr>
+        ${p.errorCodes7d.map(e => `<tr><td class="mono">${esc(e.code || '—')}</td><td>${num(e.count)}</td><td class="wrap">${hint(e.code)}</td></tr>`).join('')
+          || '<tr><td colspan="3" class="empty">Aucune erreur.</td></tr>'}
+      </table></div>
+    </div>
+  </div>
+
+  <h2>Derniers appels</h2>
+  ${logTable(p.recentCalls)}`;
+}
+
+// ─── Fragments ────────────────────────────────────────────────────────────
+function kpi(v, l, sub, color) {
+  return `<div class="card kpi"><div class="v" ${color ? `style="color:${color}"` : ''}>${v}</div><div class="l">${esc(l)}</div>${sub ? `<div class="muted" style="font-size:12px">${esc(sub)}</div>` : ''}</div>`;
+}
+function deviceCard(x) {
+  const c = !x.active ? 'var(--muted)' : x.online ? 'var(--ok)' : 'var(--bad)';
+  return `<div class="card"><b><span class="dot" style="background:${c}"></span>${esc(x.name)}</b>
+    <div class="muted" style="font-size:12px;margin-top:4px">${!x.active ? 'desactive' : x.online ? 'en ligne' : 'HORS LIGNE'} · ${esc(ago(x.lastSeenAt))}</div>
+    <div style="margin-top:8px">${num(x.sentToday)} / ${num(x.dailyLimit)} SMS ${quotaBar(x.sentToday, x.dailyLimit)}</div>
+    <div class="muted" style="font-size:12px;margin-top:6px">Batterie ${x.battery == null ? '—' : x.battery + ' %'} ${x.charging ? '⚡ en charge' : ''} · v${esc(x.appVersion || '?')}</div></div>`;
+}
+function logTable(items, compact) {
+  if (!items.length) return '<div class="panel empty">Aucun appel.</div>';
+  return `<div class="panel scroll"><table>
+    <tr><th>Date</th><th>Appelant</th><th>Requete</th><th>Statut</th><th>Erreur</th>${compact ? '' : '<th>Duree</th><th>Cle</th><th>IP</th>'}</tr>
+    ${items.map(l => `<tr>
+      <td>${esc(dt(l.at))}</td>
+      <td>${l.project ? `<b>${esc(l.project)}</b>` : l.device ? esc(l.device) : `<span class="muted">${esc(ACTOR[l.actor] || l.actor)}</span>`}</td>
+      <td class="mono">${esc(l.method)} ${esc(l.path)}</td>
+      <td>${httpPill(l.status)}${testPill(l.test)}</td>
+      <td class="wrap">${l.errorCode ? `<span class="mono">${esc(l.errorCode)}</span><br>${hint(l.errorCode)}` : ''}</td>
+      ${compact ? '' : `<td>${l.durationMs} ms</td><td class="mono">${esc(l.keyPrefix || '')}</td><td class="mono">${esc(l.ip || '')}</td>`}
+    </tr>`).join('')}
+  </table></div>`;
+}
+function smsTable(items) {
+  if (!items.length) return '<div class="panel empty">Aucun SMS.</div>';
+  return `<div class="panel scroll"><table>
+    <tr><th>Cree</th><th>Projet</th><th>Type</th><th>Numero</th><th>Statut</th><th>Telephone</th><th>Envoye</th><th>Livre</th><th>Detail</th></tr>
+    ${items.map(s => `<tr>
+      <td>${esc(dt(s.createdAt))}</td><td><b>${esc(s.project)}</b></td>
+      <td>${s.kind === 'otp' ? '<span class="pill p-pend">OTP</span>' : '<span class="pill p-mute">notif.</span>'}${testPill(s.test)}</td>
+      <td class="mono">${esc(s.phone)}</td><td>${smsPill(s.status)}${s.attempts > 1 ? ` <span class="muted">×${s.attempts}</span>` : ''}</td>
+      <td>${esc(s.device || '—')}</td><td>${esc(dt(s.sentAt))}</td><td>${esc(dt(s.deliveredAt))}</td>
+      <td class="wrap">${s.error ? `<span style="color:var(--bad)">${esc(s.error)}</span>` : s.body ? `<span class="muted">${esc(s.body)}</span>` : s.kind === 'otp' ? '<span class="muted">contenu masque (code)</span>' : ''}</td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+function secretBox(title, value, note) {
+  return `<div class="secret"><b>${esc(title)}</b><code class="mono">${esc(value)}</code>
+    <button class="b" data-copy="${esc(value)}">Copier</button><div class="muted" style="font-size:12px;margin-top:6px">${esc(note)}</div></div>`;
+}
+
+// ─── Filtres (memorises par onglet) ───────────────────────────────────────
+const filt = { lf: {}, sf: {} };
+function filters(group) {
+  document.querySelectorAll(`[data-f="${group}"]`).forEach(el => { filt[group][el.name] = el.value; });
+  return Object.fromEntries(Object.entries(filt[group]).filter(([, v]) => v));
+}
+const opt = (v, l, g, n) => `<option value="${esc(v)}" ${filt[g][n] === v ? 'selected' : ''}>${esc(l)}</option>`;
+
+// ─── Rendu et navigation ──────────────────────────────────────────────────
+async function render(quiet) {
+  const view = $('#view');
+  // Ne pas ecraser un formulaire en cours de saisie lors d'une actualisation auto.
+  if (quiet && view.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+  if (quiet && $('.secret', view)) return;
+  if (!quiet) view.innerHTML = '<div class="empty">Chargement…</div>';
+  try {
+    view.innerHTML = await views[tab]();
+  } catch (e) {
+    if (e.message !== 'auth') view.innerHTML = `<div class="card" style="color:var(--bad)">${esc(e.message)}</div>`;
+  }
+}
+function schedule() {
+  clearInterval(timer);
+  timer = setInterval(() => { if ($('#auto').checked && !document.hidden) render(true); }, 10000);
+}
+
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]'); if (!b) return;
+  tab = b.dataset.tab; if (tab !== 'projects') state.project = null;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  render();
+});
+
+$('#view').addEventListener('change', e => { if (e.target.matches('select[data-f]')) render(); });
+$('#view').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input[data-f]')) render(); });
+
+$('#view').addEventListener('change', async e => {
+  const id = e.target.dataset.limit; if (!id) return;
+  try { await api('/v1/admin/devices/' + id, {method: 'POST', body: {dailyLimit: Number(e.target.value)}}); toast('Limite enregistree.'); }
+  catch (err) { toast(err.message); }
+});
+
+$('#view').addEventListener('click', async e => {
+  const copy = e.target.closest('[data-copy]');
+  if (copy) { try { await navigator.clipboard.writeText(copy.dataset.copy); toast('Copie.'); } catch (_) { toast('Copie impossible : selectionnez le texte.'); } return; }
+
+  const go = e.target.closest('[data-goto]');
+  if (go) {
+    tab = go.dataset.goto;
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === tab));
+    return render();
+  }
+
+  const row = e.target.closest('tr[data-project], [data-goto-project]');
+  if (row) {
+    state.project = row.dataset.project || row.dataset.gotoProject; tab = 'projects';
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === 'projects'));
+    return render();
+  }
+
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  try {
+    switch (act) {
+      case 'refresh': return render();
+      case 'back': state.project = null; return render();
+
+      case 'more-logs': {
+        const last = state.logs[state.logs.length - 1];
+        const more = (await api('/v1/admin/logs?' + new URLSearchParams({...filters('lf'), before: last.at}))).items;
+        state.logs = state.logs.concat(more);
+        $('#view .panel').outerHTML = logTable(state.logs);
+        if (more.length < 100) b.remove();
+        return;
+      }
+      case 'more-sms': {
+        const last = state.sms[state.sms.length - 1];
+        const more = (await api('/v1/admin/sms?' + new URLSearchParams({...filters('sf'), before: last.createdAt}))).items;
+        state.sms = state.sms.concat(more);
+        $('#view .panel').outerHTML = smsTable(state.sms);
+        if (more.length < 100) b.remove();
+        return;
+      }
+
+      case 'create-project': {
+        const r = await api('/v1/projects', {method: 'POST', body: {
+          name: $('#np-name').value.trim(), slug: $('#np-slug').value.trim(),
+          senderLabel: $('#np-label').value.trim() || undefined, dailyQuota: Number($('#np-quota').value),
+          testSmsLimit: Number($('#np-test').value),
+        }});
+        $('#np-out').innerHTML =
+          secretBox(`Cle de TEST de ${r.name}`, r.testApiKey, `Pour le developpement : ${r.testSmsLimit} vrais SMS, puis simulation. Plus jamais affichee.`)
+          + secretBox(`Cle de PRODUCTION de ${r.name}`, r.apiKey, 'A ne transmettre qu au serveur de production (TEEEOTP_API_KEY). Plus jamais affichee.');
+        return;
+      }
+      case 'save-test':
+      case 'reset-test':
+        await api(`/v1/admin/projects/${encodeURIComponent(state.project)}/test`, {method: 'POST',
+          body: act === 'reset-test' ? {reset: true} : {testSmsLimit: Number($('#pe-test').value)}});
+        toast(act === 'reset-test' ? 'Compteur de test remis a zero.' : 'Limite de test enregistree.'); return render();
+
+      case 'approve':
+      case 'reject': {
+        const f = {};
+        document.querySelectorAll(`[data-ar="${b.dataset.id}"]`).forEach(el => { if (el.value !== '') f[el.name] = el.name === 'testSmsLimit' ? Number(el.value) : el.value; });
+        if (act === 'reject' && !confirm('Refuser cette demande ?')) return;
+        const r = await api(`/v1/admin/access-requests/${b.dataset.id}/${act}`, {method: 'POST', body: f});
+        toast(act === 'approve' ? `Projet ${r.project} cree${r.notifiedBySms ? ', demandeur prevenu par SMS' : ''}.` : 'Demande refusee.');
+        return render();
+      }
+      case 'save-project':
+        await api('/v1/admin/projects/' + encodeURIComponent(state.project), {method: 'POST', body: {senderLabel: $('#pe-label').value, dailyQuota: Number($('#pe-quota').value)}});
+        toast('Projet enregistre.'); return render();
+      case 'toggle-project':
+        if (b.dataset.active === '0' && !confirm('Suspendre ce projet ? Tous ses appels seront refuses.')) return;
+        await api('/v1/admin/projects/' + encodeURIComponent(state.project), {method: 'POST', body: {active: b.dataset.active === '1'}});
+        return render();
+      case 'new-key': {
+        const r = await api(`/v1/projects/${encodeURIComponent(state.project)}/keys`, {method: 'POST', body: {env: b.dataset.env}});
+        $('#pk-out').innerHTML = secretBox(r.env === 'test' ? 'Nouvelle cle de test' : 'Nouvelle cle de production', r.apiKey, 'Les cles precedentes restent actives : revoquez-les une fois le projet bascule.');
+        return;
+      }
+      case 'revoke':
+        if (!confirm('Revoquer cette cle ? Le projet qui l utilise recevra 401 immediatement.')) return;
+        await api(`/v1/admin/keys/${b.dataset.id}/revoke`, {method: 'POST'}); toast('Cle revoquee.'); return render();
+
+      case 'create-device': {
+        const r = await api('/v1/devices', {method: 'POST', body: {name: $('#nd-name').value.trim(), dailyLimit: Number($('#nd-limit').value)}});
+        $('#nd-out').innerHTML = secretBox('Jeton du telephone', r.deviceToken, `A saisir dans l'appli, avec l'URL ${r.serverUrl}. Il ne sera plus jamais affiche.`);
+        return;
+      }
+      case 'device-toggle':
+        await api('/v1/admin/devices/' + b.dataset.id, {method: 'POST', body: {active: b.dataset.active === '1'}});
+        return render();
+
+      case 'test-sms': {
+        const r = await api('/v1/admin/test-sms', {method: 'POST', body: {project: $('#ts-project').value, phone: $('#ts-phone').value, message: $('#ts-msg').value}});
+        $('#ts-out').innerHTML = `<span class="pill p-pend">en file</span> <span class="mono">${esc(r.id)}</span> — suivi dans l'onglet SMS.`;
+        return;
+      }
+      case 'migrate': {
+        const r = await api('/v1/admin/migrate', {method: 'POST'});
+        toast(r.errors.length ? 'Erreurs : ' + r.errors.join(' | ') : (r.applied.length ? `Ajoute : ${r.applied.join(', ')}` : 'Schema deja a jour.'));
+        return;
+      }
+    }
+  } catch (err) { if (err.message !== 'auth') toast(err.message); }
+});
+
+// ─── Connexion ────────────────────────────────────────────────────────────
+async function login(key) {
+  KEY = key;
+  try {
+    await fetch(BASE + '/v1/admin/overview', {headers: {'X-Admin-Key': key}}).then(r => { if (!r.ok) throw new Error(r.status === 403 ? 'Cle refusee.' : `HTTP ${r.status}`); });
+    store(false, key);
+    $('#login').classList.add('hidden'); $('#app').classList.remove('hidden');
+    render(); schedule();
+  } catch (e) {
+    KEY = null; store(false);
+    $('#login').classList.remove('hidden'); $('#app').classList.add('hidden');
+    $('#loginErr').textContent = e.message;
+  }
+}
+function logout(msg) {
+  KEY = null; store(false); clearInterval(timer);
+  $('#app').classList.add('hidden'); $('#login').classList.remove('hidden');
+  $('#loginErr').textContent = msg || ''; $('#key').value = '';
+}
+$('#loginBtn').addEventListener('click', () => login($('#key').value.trim()));
+$('#key').addEventListener('keydown', e => { if (e.key === 'Enter') login($('#key').value.trim()); });
+$('#logout').addEventListener('click', () => logout());
+
+// Lien personnel : <base>/admin/#k=<cle> connecte directement, sans ecran de
+// saisie. Le fragment (#) n'est jamais envoye au serveur ni journalise ; il est
+// efface de la barre d'adresse des la lecture.
+const fromLink = new URLSearchParams(location.hash.slice(1)).get('k');
+if (fromLink) {
+  history.replaceState(null, '', location.pathname);
+  // Rester connecte : le lien n'a servi qu'une fois, les visites suivantes
+  // passent par /admin/ directement.
+  $('#remember').checked = true;
+}
+const saved = fromLink || store(true);
+if (saved) login(saved); else $('#login').classList.remove('hidden');
+})();
+</script>
+</body>
+</html>
