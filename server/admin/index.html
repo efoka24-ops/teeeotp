@@ -98,6 +98,7 @@ pre{background:var(--code);padding:12px;border-radius:8px;overflow:auto;font-siz
     <nav id="tabs">
       <button data-tab="overview" class="on">Vue d'ensemble</button>
       <button data-tab="projects">Integrations</button>
+      <button data-tab="access">Demandes d'acces <span id="accessBadge" class="pill p-bad hidden"></span></button>
       <button data-tab="logs">Journal API</button>
       <button data-tab="sms">SMS</button>
       <button data-tab="devices">Telephones</button>
@@ -183,6 +184,12 @@ const HINT = {
   MISCONFIGURED: 'Variable obligatoire absente de teeeotp.env.',
 };
 const hint = c => HINT[c] ? `<span class="muted">${esc(HINT[c])}</span>` : '';
+const testPill = t => t ? ' <span class="pill p-warn">TEST</span>' : '';
+const modePill = p => p.liveKeys ? '<span class="pill p-ok">production</span>' : '<span class="pill p-warn">test seulement</span>';
+function badge(n) {
+  const b = $('#accessBadge'); if (!b) return;
+  b.textContent = n; b.classList.toggle('hidden', !n);
+}
 
 function quotaBar(used, quota) {
   const p = quota ? Math.min(100, Math.round(used / quota * 100)) : 0;
@@ -194,6 +201,7 @@ const views = {
 
   async overview() {
     const d = await api('/v1/admin/overview');
+    badge(d.pendingAccess);
     const s = d.smsToday;
     const sent = s.sent + s.delivered;
     const max = Math.max(1, ...d.series.map(x => x.ok + x.failed + x.pending));
@@ -209,6 +217,8 @@ const views = {
       ${kpi(num(d.api24h.errors), 'Appels en erreur (24 h)', '', d.api24h.errors ? 'var(--bad)' : '')}
     </div>
 
+    ${d.pendingAccess ? `<div class="secret" style="margin-top:12px"><b>${d.pendingAccess} demande(s) d'acces en attente.</b> <button class="b" data-goto="access">Examiner</button></div>` : ''}
+
     <h2>Telephones passerelles</h2>
     <div class="grid">${d.devices.map(deviceCard).join('') || '<div class="card muted">Aucun telephone enrole.</div>'}</div>
 
@@ -222,10 +232,11 @@ const views = {
 
     <h2>Integrations</h2>
     <div class="panel scroll"><table>
-      <tr><th>Projet</th><th>Etat</th><th>SMS du jour</th><th></th><th>Appels 24 h</th><th>Erreurs 24 h</th><th>Dernier appel</th><th>Derniere erreur</th></tr>
+      <tr><th>Projet</th><th>Etat</th><th>Mode</th><th>SMS du jour</th><th></th><th>Appels 24 h</th><th>Erreurs 24 h</th><th>Dernier appel</th><th>Derniere erreur</th></tr>
       ${d.projects.map(p => `<tr class="click" data-project="${esc(p.slug)}">
         <td><b>${esc(p.name)}</b><br><span class="muted mono">${esc(p.slug)}</span></td>
         <td>${p.active ? '<span class="pill p-ok">actif</span>' : '<span class="pill p-bad">suspendu</span>'}</td>
+        <td>${modePill(p)}<br><span class="muted" style="font-size:12px">test : ${p.testSms.used}/${p.testSms.limit} SMS</span></td>
         <td>${num(p.usedToday)} / ${num(p.dailyQuota)}</td><td>${quotaBar(p.usedToday, p.dailyQuota)}</td>
         <td>${num(p.calls24h)}</td>
         <td>${p.errors24h ? `<span class="pill p-bad">${num(p.errors24h)}</span>` : '0'}</td>
@@ -246,10 +257,11 @@ const views = {
       <div>
         <h2>Projets integres</h2>
         <div class="panel scroll"><table>
-          <tr><th>Projet</th><th>Etat</th><th>Quota du jour</th><th>Dernier appel</th><th>Erreurs 24 h</th></tr>
+          <tr><th>Projet</th><th>Etat</th><th>Mode</th><th>Quota du jour</th><th>Dernier appel</th><th>Erreurs 24 h</th></tr>
           ${d.projects.map(p => `<tr class="click" data-project="${esc(p.slug)}">
-            <td><b>${esc(p.name)}</b> <span class="muted mono">${esc(p.slug)}</span></td>
+            <td><b>${esc(p.name)}</b> <span class="muted mono">${esc(p.slug)}</span>${p.origin === 'self-service' ? ' <span class="pill p-mute">libre-service</span>' : ''}</td>
             <td>${p.active ? '<span class="pill p-ok">actif</span>' : '<span class="pill p-bad">suspendu</span>'}</td>
+            <td>${modePill(p)}</td>
             <td>${quotaBar(p.usedToday, p.dailyQuota)} <span class="muted">${num(p.usedToday)} / ${num(p.dailyQuota)}</span></td>
             <td>${p.lastCallAt ? esc(ago(p.lastCallAt)) : '<span class="pill p-warn">aucun appel</span>'}</td>
             <td>${p.errors24h ? `<span class="pill p-bad">${num(p.errors24h)}</span>` : '0'}</td>
@@ -262,12 +274,46 @@ const views = {
           <label class="f"><span>Nom</span><input id="np-name" placeholder="Scholaris ERP"></label>
           <label class="f"><span>Identifiant (slug)</span><input id="np-slug" placeholder="scholariserp"></label>
           <label class="f"><span>Nom affiche dans le SMS (sans accent)</span><input id="np-label" placeholder="Scholaris"></label>
-          <label class="f"><span>Quota de SMS par jour</span><input id="np-quota" type="number" value="500" min="1"></label>
-          <button class="b primary" data-act="create-project">Creer et generer la cle</button>
+          <label class="f"><span>Quota de SMS par jour (production)</span><input id="np-quota" type="number" value="500" min="1"></label>
+          <label class="f"><span>Vrais SMS autorises avec la cle de test</span><input id="np-test" type="number" value="5" min="0"></label>
+          <button class="b primary" data-act="create-project">Creer et generer les cles</button>
           <div id="np-out"></div>
         </div>
       </div>
     </div>`;
+  },
+
+  async access() {
+    const d = await api('/v1/admin/access-requests');
+    badge(d.items.filter(a => a.status === 'pending').length);
+    if (!d.items.length) return `<div class="panel empty">Aucune demande. Le formulaire public est sur <a href="${esc(BASE)}/docs/#acces" target="_blank">la documentation</a>.</div>`;
+    const ST = {pending: ['en attente', 'p-pend'], approved: ['validee', 'p-ok'], rejected: ['refusee', 'p-bad']};
+    return `
+    <p class="muted">Une demande validee cree un projet avec une cle de <b>test</b> seulement (vrais SMS limites, puis simulation).
+      Le demandeur recupere sa cle sur sa page de suivi ; elle est chiffree jusque-la et n'est affichee qu'une fois.</p>
+    ${d.items.map(a => `<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <b style="font-size:15px">${esc(a.projectName)}</b> <span class="pill ${ST[a.status][1]}">${ST[a.status][0]}</span>
+        ${a.project ? `<span class="click mono" data-goto-project="${esc(a.project)}" style="cursor:pointer;color:var(--accent)">${esc(a.project)} →</span>` : ''}
+        <span class="spacer"></span><span class="muted">${esc(dt(a.createdAt))}</span>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <div><span class="muted">Contact</span><br>${esc(a.contactName)}${a.company ? ` — ${esc(a.company)}` : ''}<br>
+          <span class="mono">${esc(a.email)}</span><br><span class="mono">${esc(a.phone)}</span><br><span class="muted mono" style="font-size:11px">IP ${esc(a.ip || '')}</span></div>
+        <div class="wrap"><span class="muted">Usage prevu</span><br>${esc(a.useCase)}</div>
+      </div>
+      ${a.status === 'pending' ? `
+      <div class="filters" style="margin-top:12px">
+        <input data-ar="${esc(a.id)}" name="slug" placeholder="slug (auto si vide)">
+        <input data-ar="${esc(a.id)}" name="senderLabel" placeholder="nom dans le SMS" maxlength="30">
+        <label class="muted">SMS de test <input data-ar="${esc(a.id)}" name="testSmsLimit" type="number" min="0" value="5" style="width:70px"></label>
+        <input data-ar="${esc(a.id)}" name="note" placeholder="note au demandeur (facultatif)" style="flex:1;min-width:200px">
+        <button class="b primary" data-act="approve" data-id="${esc(a.id)}">Valider</button>
+        <button class="b danger" data-act="reject" data-id="${esc(a.id)}">Refuser</button>
+      </div>` : `
+      <p class="muted" style="margin:10px 0 0">${a.status === 'approved' ? (a.keyPending ? 'Cle pas encore recuperee par le demandeur.' : `Cle recuperee ${esc(ago(a.keyRetrievedAt))}.`) : ''}
+        ${a.decisionNote ? `Note : ${esc(a.decisionNote)}` : ''}</p>`}
+    </div>`).join('')}`;
   },
 
   async logs() {
@@ -355,7 +401,8 @@ const views = {
         <p class="muted">Cree les tables ajoutees depuis l'installation (journal des appels…). Sans effet si elles existent deja.</p>
         <button class="b" data-act="migrate">Mettre a jour le schema</button>
         <h2>Integrer un projet</h2>
-        <p class="muted">Client PHP a copier : <span class="mono">clients/php/TeeeOtpClient.php</span> du depot.</p>
+        <p class="muted">Documentation publique a partager : <a href="${esc(BASE)}/docs/" target="_blank">${esc(location.origin + BASE)}/docs/</a>.
+          Client PHP a copier : <span class="mono">clients/php/TeeeOtpClient.php</span> du depot.</p>
         <pre>$otp = new TeeeOtpClient('${esc(location.origin + BASE)}', getenv('TEEEOTP_API_KEY'));
 
 // Envoyer un code
@@ -386,7 +433,16 @@ async function projectDetail(slug) {
         <button class="b primary" data-act="save-project">Enregistrer</button>
         <button class="b ${p.active ? 'danger' : ''}" data-act="toggle-project" data-active="${p.active ? 0 : 1}">${p.active ? 'Suspendre le projet' : 'Reactiver le projet'}</button>
       </div>
-      <p class="muted" style="font-size:12px">Cree le ${esc(dt(p.createdAt))}. Un projet suspendu recoit 401 sur tous ses appels.</p>
+      <p class="muted" style="font-size:12px">Cree le ${esc(dt(p.createdAt))}${p.origin === 'self-service' ? ' en libre-service' : ''}. Un projet suspendu recoit 401 sur tous ses appels.</p>
+      ${p.contact && (p.contact.name || p.contact.email) ? `<p style="font-size:13px"><span class="muted">Contact :</span> ${esc(p.contact.name || '')} <span class="mono">${esc(p.contact.email || '')}</span> <span class="mono">${esc(p.contact.phone || '')}</span></p>` : ''}
+      <h2>Mode test</h2>
+      <p style="margin:0 0 8px">${p.testSms.used} / ${p.testSms.limit} vrais SMS utilises ${quotaBar(p.testSms.used, p.testSms.limit)}</p>
+      <p class="muted" style="font-size:12px;margin:0 0 8px">Au-dela, la cle de test continue de repondre mais simule l'envoi (le code est renvoye dans la reponse).</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input id="pe-test" type="number" min="0" value="${p.testSms.limit}" style="width:90px">
+        <button class="b" data-act="save-test">Changer la limite</button>
+        <button class="b" data-act="reset-test">Remettre a zero</button>
+      </div>
     </div>
     <div class="grid" style="align-content:start">
       ${kpi(num(calls), 'Appels (7 j)', '')}
@@ -398,15 +454,19 @@ async function projectDetail(slug) {
 
   <h2>Cles API</h2>
   <div class="panel scroll"><table>
-    <tr><th>Prefixe</th><th>Libelle</th><th>Creee</th><th>Derniere utilisation</th><th>Etat</th><th></th></tr>
+    <tr><th>Cle</th><th>Type</th><th>Libelle</th><th>Creee</th><th>Derniere utilisation</th><th>Etat</th><th></th></tr>
     ${p.keys.map(k => `<tr>
-      <td class="mono">${esc(k.prefix)}_…</td><td>${esc(k.label || '')}</td><td>${esc(dt(k.createdAt))}</td>
+      <td class="mono">sk_…${esc(k.prefix)}_…</td>
+      <td>${k.env === 'test' ? '<span class="pill p-warn">test</span>' : '<span class="pill p-ok">production</span>'}</td>
+      <td>${esc(k.label || '')}</td><td>${esc(dt(k.createdAt))}</td>
       <td>${k.lastUsedAt ? esc(ago(k.lastUsedAt)) : '<span class="pill p-warn">jamais utilisee</span>'}</td>
       <td>${k.revokedAt ? `<span class="pill p-bad">revoquee</span>` : '<span class="pill p-ok">active</span>'}</td>
       <td>${k.revokedAt ? '' : `<button class="b danger" data-act="revoke" data-id="${esc(k.id)}">Revoquer</button>`}</td>
     </tr>`).join('')}
   </table></div>
-  <p><button class="b" data-act="new-key">Generer une nouvelle cle</button> <span class="muted">Les anciennes restent actives jusqu'a revocation : rotation sans coupure.</span></p>
+  <p><button class="b" data-act="new-key" data-env="live">Nouvelle cle de production</button>
+     <button class="b" data-act="new-key" data-env="test">Nouvelle cle de test</button>
+     <span class="muted">Les anciennes restent actives jusqu'a revocation : rotation sans coupure.</span></p>
   <div id="pk-out"></div>
 
   <div class="row">
@@ -452,7 +512,7 @@ function logTable(items, compact) {
       <td>${esc(dt(l.at))}</td>
       <td>${l.project ? `<b>${esc(l.project)}</b>` : l.device ? esc(l.device) : `<span class="muted">${esc(ACTOR[l.actor] || l.actor)}</span>`}</td>
       <td class="mono">${esc(l.method)} ${esc(l.path)}</td>
-      <td>${httpPill(l.status)}</td>
+      <td>${httpPill(l.status)}${testPill(l.test)}</td>
       <td class="wrap">${l.errorCode ? `<span class="mono">${esc(l.errorCode)}</span><br>${hint(l.errorCode)}` : ''}</td>
       ${compact ? '' : `<td>${l.durationMs} ms</td><td class="mono">${esc(l.keyPrefix || '')}</td><td class="mono">${esc(l.ip || '')}</td>`}
     </tr>`).join('')}
@@ -464,7 +524,7 @@ function smsTable(items) {
     <tr><th>Cree</th><th>Projet</th><th>Type</th><th>Numero</th><th>Statut</th><th>Telephone</th><th>Envoye</th><th>Livre</th><th>Detail</th></tr>
     ${items.map(s => `<tr>
       <td>${esc(dt(s.createdAt))}</td><td><b>${esc(s.project)}</b></td>
-      <td>${s.kind === 'otp' ? '<span class="pill p-pend">OTP</span>' : '<span class="pill p-mute">notif.</span>'}</td>
+      <td>${s.kind === 'otp' ? '<span class="pill p-pend">OTP</span>' : '<span class="pill p-mute">notif.</span>'}${testPill(s.test)}</td>
       <td class="mono">${esc(s.phone)}</td><td>${smsPill(s.status)}${s.attempts > 1 ? ` <span class="muted">×${s.attempts}</span>` : ''}</td>
       <td>${esc(s.device || '—')}</td><td>${esc(dt(s.sentAt))}</td><td>${esc(dt(s.deliveredAt))}</td>
       <td class="wrap">${s.error ? `<span style="color:var(--bad)">${esc(s.error)}</span>` : s.body ? `<span class="muted">${esc(s.body)}</span>` : s.kind === 'otp' ? '<span class="muted">contenu masque (code)</span>' : ''}</td>
@@ -522,9 +582,16 @@ $('#view').addEventListener('click', async e => {
   const copy = e.target.closest('[data-copy]');
   if (copy) { try { await navigator.clipboard.writeText(copy.dataset.copy); toast('Copie.'); } catch (_) { toast('Copie impossible : selectionnez le texte.'); } return; }
 
-  const row = e.target.closest('tr[data-project]');
+  const go = e.target.closest('[data-goto]');
+  if (go) {
+    tab = go.dataset.goto;
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === tab));
+    return render();
+  }
+
+  const row = e.target.closest('tr[data-project], [data-goto-project]');
   if (row) {
-    state.project = row.dataset.project; tab = 'projects';
+    state.project = row.dataset.project || row.dataset.gotoProject; tab = 'projects';
     document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x.dataset.tab === 'projects'));
     return render();
   }
@@ -557,9 +624,27 @@ $('#view').addEventListener('click', async e => {
         const r = await api('/v1/projects', {method: 'POST', body: {
           name: $('#np-name').value.trim(), slug: $('#np-slug').value.trim(),
           senderLabel: $('#np-label').value.trim() || undefined, dailyQuota: Number($('#np-quota').value),
+          testSmsLimit: Number($('#np-test').value),
         }});
-        $('#np-out').innerHTML = secretBox(`Cle API de ${r.name}`, r.apiKey, 'A transmettre au projet (TEEEOTP_API_KEY). Elle ne sera plus jamais affichee.');
+        $('#np-out').innerHTML =
+          secretBox(`Cle de TEST de ${r.name}`, r.testApiKey, `Pour le developpement : ${r.testSmsLimit} vrais SMS, puis simulation. Plus jamais affichee.`)
+          + secretBox(`Cle de PRODUCTION de ${r.name}`, r.apiKey, 'A ne transmettre qu au serveur de production (TEEEOTP_API_KEY). Plus jamais affichee.');
         return;
+      }
+      case 'save-test':
+      case 'reset-test':
+        await api(`/v1/admin/projects/${encodeURIComponent(state.project)}/test`, {method: 'POST',
+          body: act === 'reset-test' ? {reset: true} : {testSmsLimit: Number($('#pe-test').value)}});
+        toast(act === 'reset-test' ? 'Compteur de test remis a zero.' : 'Limite de test enregistree.'); return render();
+
+      case 'approve':
+      case 'reject': {
+        const f = {};
+        document.querySelectorAll(`[data-ar="${b.dataset.id}"]`).forEach(el => { if (el.value !== '') f[el.name] = el.name === 'testSmsLimit' ? Number(el.value) : el.value; });
+        if (act === 'reject' && !confirm('Refuser cette demande ?')) return;
+        const r = await api(`/v1/admin/access-requests/${b.dataset.id}/${act}`, {method: 'POST', body: f});
+        toast(act === 'approve' ? `Projet ${r.project} cree${r.notifiedBySms ? ', demandeur prevenu par SMS' : ''}.` : 'Demande refusee.');
+        return render();
       }
       case 'save-project':
         await api('/v1/admin/projects/' + encodeURIComponent(state.project), {method: 'POST', body: {senderLabel: $('#pe-label').value, dailyQuota: Number($('#pe-quota').value)}});
@@ -569,8 +654,8 @@ $('#view').addEventListener('click', async e => {
         await api('/v1/admin/projects/' + encodeURIComponent(state.project), {method: 'POST', body: {active: b.dataset.active === '1'}});
         return render();
       case 'new-key': {
-        const r = await api(`/v1/projects/${encodeURIComponent(state.project)}/keys`, {method: 'POST'});
-        $('#pk-out').innerHTML = secretBox('Nouvelle cle API', r.apiKey, 'Les cles precedentes restent actives : revoquez-les une fois le projet bascule.');
+        const r = await api(`/v1/projects/${encodeURIComponent(state.project)}/keys`, {method: 'POST', body: {env: b.dataset.env}});
+        $('#pk-out').innerHTML = secretBox(r.env === 'test' ? 'Nouvelle cle de test' : 'Nouvelle cle de production', r.apiKey, 'Les cles precedentes restent actives : revoquez-les une fois le projet bascule.');
         return;
       }
       case 'revoke':
@@ -593,7 +678,7 @@ $('#view').addEventListener('click', async e => {
       }
       case 'migrate': {
         const r = await api('/v1/admin/migrate', {method: 'POST'});
-        toast(r.errors.length ? 'Erreurs : ' + r.errors.join(' | ') : `Schema a jour (${r.applied} instruction(s)).`);
+        toast(r.errors.length ? 'Erreurs : ' + r.errors.join(' | ') : (r.applied.length ? `Ajoute : ${r.applied.join(', ')}` : 'Schema deja a jour.'));
         return;
       }
     }

@@ -5,7 +5,9 @@ declare(strict_types=1);
 /**
  * Trois identites distinctes, chacune avec son propre secret :
  *
- *  - un PROJET (KoliGo, ERP…)   : cle `sk_<prefixe>_<secret>` en X-Api-Key ;
+ *  - un PROJET (KoliGo, ERP…)   : cle `sk_live_…` ou `sk_test_…` en X-Api-Key
+ *                                 (les premieres cles, `sk_<prefixe>_<secret>`,
+ *                                 restent valides et sont de production) ;
  *  - un TELEPHONE passerelle    : jeton `dv_<prefixe>_<secret>` en Bearer ;
  *  - l'ADMINISTRATEUR            : ADMIN_API_KEY en X-Admin-Key.
  *
@@ -25,6 +27,19 @@ final class Auth
         return ['plaintext' => $plaintext, 'prefix' => $prefix, 'hash' => self::hash($plaintext)];
     }
 
+    /**
+     * Cle de projet : `sk_live_<prefixe>_<secret>` ou `sk_test_<prefixe>_<secret>`.
+     *
+     * @return array{plaintext: string, prefix: string, hash: string, env: string}
+     */
+    public static function generateApiKey(string $env): array
+    {
+        $prefix    = bin2hex(random_bytes(6));
+        $plaintext = "sk_{$env}_{$prefix}_" . bin2hex(random_bytes(24));
+
+        return ['plaintext' => $plaintext, 'prefix' => $prefix, 'hash' => self::hash($plaintext), 'env' => $env];
+    }
+
     public static function hash(string $plaintext): string
     {
         return hash('sha256', Config::required('API_KEY_SALT') . ':' . $plaintext);
@@ -33,6 +48,10 @@ final class Auth
     private static function prefixOf(string $plaintext, string $kind): ?string
     {
         $parts = explode('_', $plaintext);
+        // sk_live_<prefixe>_<secret> / sk_test_<prefixe>_<secret>
+        if (count($parts) === 4 && $kind === 'sk' && $parts[0] === 'sk' && in_array($parts[1], ['live', 'test'], true)) {
+            return $parts[2] === '' ? null : $parts[2];
+        }
         if (count($parts) !== 3 || $parts[0] !== $kind || $parts[1] === '') {
             return null;
         }
@@ -59,8 +78,9 @@ final class Auth
 
         $prefix = self::prefixOf($presented, 'sk');
         $record = $prefix === null ? null : Db::one(
-            'SELECT k.`id` AS keyId, k.`hash`, k.`revokedAt`,
-                    t.`id`, t.`name`, t.`slug`, t.`senderLabel`, t.`dailyQuota`, t.`active`
+            'SELECT k.`id` AS keyId, k.`hash`, k.`revokedAt`, k.`env`,
+                    t.`id`, t.`name`, t.`slug`, t.`senderLabel`, t.`dailyQuota`, t.`active`,
+                    t.`testSmsLimit`, t.`testSmsUsed`
              FROM `otp_api_keys` k JOIN `otp_tenants` t ON t.`id` = k.`tenantId`
              WHERE k.`prefix` = ?',
             [$prefix]
@@ -73,7 +93,7 @@ final class Auth
             ApiLog::keyPrefix("sk_$prefix");
         }
         if ($record !== null) {
-            ApiLog::tenant((string) $record['id']);
+            ApiLog::tenant((string) $record['id'], $record['env'] === 'test');
         }
 
         if (
@@ -92,7 +112,10 @@ final class Auth
         }
 
         unset($record['hash'], $record['revokedAt'], $record['keyId'], $record['active']);
-        $record['dailyQuota'] = (int) $record['dailyQuota'];
+        $record['dailyQuota']   = (int) $record['dailyQuota'];
+        $record['testSmsLimit'] = (int) $record['testSmsLimit'];
+        $record['testSmsUsed']  = (int) $record['testSmsUsed'];
+        $record['test']         = $record['env'] === 'test';
         return self::$tenant = $record;
     }
 

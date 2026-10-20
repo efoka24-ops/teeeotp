@@ -13,19 +13,30 @@ declare(strict_types=1);
  */
 final class Otp
 {
-    /** @return array{requestId: string, expiresIn: int, length: int} */
+    /** @return array<string, mixed> */
     public static function send(array $tenant, string $phone, string $purpose, int $length): array
     {
-        $ttl = Config::int('OTP_TTL_SECONDS', 300);
+        $ttl  = Config::int('OTP_TTL_SECONDS', 300);
+        $test = !empty($tenant['test']);
 
         // Anti-abus par numero : sans ce frein, n'importe qui pourrait vider le
-        // forfait en demandant des codes pour un meme numero en boucle.
+        // forfait en demandant des codes pour un meme numero en boucle. En test,
+        // le frein est propre au projet et plus large : une equipe qui
+        // integre redemande souvent un code pour son propre numero.
         $window = Config::int('OTP_RATE_WINDOW_SECONDS', 900);
-        $max    = Config::int('OTP_RATE_MAX_PER_PHONE', 3);
-        $recent = (int) Db::value(
-            'SELECT COUNT(*) FROM `otp_requests` WHERE `phone` = ? AND `createdAt` >= ?',
-            [$phone, Db::now(-$window)]
-        );
+        if ($test) {
+            $max    = Config::int('OTP_TEST_RATE_MAX_PER_PHONE', 10);
+            $recent = (int) Db::value(
+                'SELECT COUNT(*) FROM `otp_requests` WHERE `phone` = ? AND `tenantId` = ? AND `test` = 1 AND `createdAt` >= ?',
+                [$phone, $tenant['id'], Db::now(-$window)]
+            );
+        } else {
+            $max    = Config::int('OTP_RATE_MAX_PER_PHONE', 3);
+            $recent = (int) Db::value(
+                'SELECT COUNT(*) FROM `otp_requests` WHERE `phone` = ? AND `test` = 0 AND `createdAt` >= ?',
+                [$phone, Db::now(-$window)]
+            );
+        }
         if ($recent >= $max) {
             Http::fail(
                 "Trop de codes demandes pour ce numero. Reessayez dans quelques minutes.",
@@ -49,8 +60,8 @@ final class Otp
             $minutes
         );
 
-        Db::transaction(static function () use ($tenant, $phone, $purpose, $requestId, $code, $ttl, $body): void {
-            $smsId = SmsQueue::enqueue($tenant, 'otp', $phone, $body, $ttl);
+        $sms = Db::transaction(static function () use ($tenant, $phone, $purpose, $requestId, $code, $ttl, $body, $test): array {
+            $sms = SmsQueue::dispatch($tenant, 'otp', $phone, $body, $ttl);
             Db::insert('otp_requests', [
                 'id'           => $requestId,
                 'tenantId'     => $tenant['id'],
@@ -58,12 +69,25 @@ final class Otp
                 'purpose'      => $purpose,
                 'codeHash'     => self::hash($requestId, $code),
                 'attemptsLeft' => Config::int('OTP_MAX_ATTEMPTS', 5),
-                'smsId'        => $smsId,
+                'smsId'        => $sms['id'],
+                'test'         => $test ? 1 : 0,
                 'expiresAt'    => Db::now($ttl),
             ]);
+            return $sms;
         });
 
-        return ['requestId' => $requestId, 'expiresIn' => $ttl, 'length' => $length];
+        $result = [
+            'requestId' => $requestId,
+            'expiresIn' => $ttl,
+            'length'    => $length,
+            'status'    => $sms['simulated'] ? 'simulated' : 'queued',
+        ];
+        if ($test) {
+            // En test seulement : le code est rendu pour que les tests
+            // automatises puissent verifier sans lire de SMS.
+            $result += ['test' => true, 'testCode' => $code, 'testSmsRemaining' => $sms['testRemaining']];
+        }
+        return $result;
     }
 
     /**
@@ -132,7 +156,8 @@ final class Otp
             'expiresAt'    => Db::iso($row['expiresAt']),
             'verifiedAt'   => Db::iso($row['verifiedAt']),
             'sms'          => [
-                'status'      => $row['smsStatus'],
+                // Sans SMS associe : envoi simule (cle de test au-dela de l'allocation).
+                'status'      => $row['smsStatus'] ?? 'simulated',
                 'sentAt'      => Db::iso($row['sentAt']),
                 'deliveredAt' => Db::iso($row['deliveredAt']),
                 'error'       => $row['smsError'],

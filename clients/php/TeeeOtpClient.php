@@ -16,6 +16,11 @@ declare(strict_types=1);
  *   if ($res['valid']) { … activer le compte … }
  *
  * Le projet ne voit jamais le code : il ne conserve que requestId.
+ *
+ * Avec une cle de test (sk_test_…), les reponses portent en plus `test`,
+ * `testCode` (le code envoye, pour les tests automatises) et
+ * `testSmsRemaining` ; au-dela de l allocation de vrais SMS, `status` vaut
+ * `simulated` et rien ne part.
  */
 final class TeeeOtpClient
 {
@@ -30,7 +35,7 @@ final class TeeeOtpClient
     /**
      * Demande l'envoi d'un code par SMS.
      *
-     * @return array{requestId: string, expiresIn: int, length: int, status: string}
+     * @return array{requestId: string, expiresIn: int, length: int, status: string, testCode?: string}
      * @throws TeeeOtpException code TOO_MANY_REQUESTS, QUOTA_EXCEEDED, INVALID_PHONE…
      */
     public function sendOtp(string $phone, string $purpose = 'verification', int $length = 6): array
@@ -74,6 +79,12 @@ final class TeeeOtpClient
             'message'    => $message,
             'ttlSeconds' => $ttlSeconds,
         ]);
+    }
+
+    /** Projet de la cle : nom, mode (test ou live), quota et consommation. */
+    public function me(): array
+    {
+        return $this->request('GET', '/v1/me');
     }
 
     public function smsStatus(string $id): array

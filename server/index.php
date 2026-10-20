@@ -28,6 +28,8 @@ require __DIR__ . '/lib/SmsQueue.php';
 require __DIR__ . '/lib/Otp.php';
 require __DIR__ . '/lib/ApiLog.php';
 require __DIR__ . '/lib/Migrations.php';
+require __DIR__ . '/lib/Tenants.php';
+require __DIR__ . '/lib/AccessRequests.php';
 require __DIR__ . '/lib/Router.php';
 
 Config::boot(__DIR__);
@@ -50,7 +52,7 @@ if (Http::method() === 'OPTIONS') {
 $path = '/' . trim((string) ($_GET['__path'] ?? ''), '/');
 
 $router = new Router();
-foreach (['otp', 'gateway', 'admin', 'backoffice'] as $groupe) {
+foreach (['otp', 'gateway', 'admin', 'backoffice', 'access'] as $groupe) {
     (require __DIR__ . "/routes/$groupe.php")($router);
 }
 

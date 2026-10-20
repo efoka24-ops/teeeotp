@@ -33,7 +33,7 @@ return static function (Router $r): void {
             Http::fail($e->getMessage(), 429, 'QUOTA_EXCEEDED');
         }
 
-        Http::ok($result + ['status' => 'queued'], 202);
+        Http::ok($result, 202);
     });
 
     // ─── Verifier un code ────────────────────────────────────────────────────
@@ -79,12 +79,16 @@ return static function (Router $r): void {
         $ttl = max(60, min($ttl, 7 * 86400));
 
         try {
-            $id = SmsQueue::enqueue($tenant, 'notification', $phone, $message, $ttl);
+            $sms = SmsQueue::dispatch($tenant, 'notification', $phone, $message, $ttl);
         } catch (QuotaExceeded $e) {
             Http::fail($e->getMessage(), 429, 'QUOTA_EXCEEDED');
         }
 
-        Http::ok(['id' => $id, 'status' => 'queued'], 202);
+        $out = ['id' => $sms['id'], 'status' => $sms['simulated'] ? 'simulated' : 'queued'];
+        if ($tenant['test']) {
+            $out += ['test' => true, 'testSmsRemaining' => $sms['testRemaining']];
+        }
+        Http::ok($out, 202);
     });
 
     $r->get('/v1/sms/{id}', static function (array $args): void {
@@ -122,6 +126,8 @@ return static function (Router $r): void {
             'slug'        => $tenant['slug'],
             'senderLabel' => $tenant['senderLabel'],
             'dailyQuota'  => $tenant['dailyQuota'],
+            'mode'        => $tenant['test'] ? 'test' : 'live',
+            'testSms'     => ['limit' => $tenant['testSmsLimit'], 'used' => $tenant['testSmsUsed']],
             'usedToday'   => (int) Db::value(
                 'SELECT COUNT(*) FROM `otp_sms_messages` WHERE `tenantId` = ? AND `createdAt` >= ?',
                 [$tenant['id'], gmdate('Y-m-d 00:00:00')]

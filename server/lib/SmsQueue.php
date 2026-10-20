@@ -17,11 +17,50 @@ final class SmsQueue
     private const MAX_ATTEMPTS = 3;
 
     /**
+     * Point d'entree des projets : met le SMS en file, ou le simule.
+     *
+     * Avec une cle de test, le projet dispose de `testSmsLimit` vrais SMS au
+     * total ; au-dela, l'appel reussit mais rien ne part (`simulated`). Les
+     * equipes peuvent ainsi recevoir quelques vrais SMS pendant leur
+     * integration, puis tester sans limite sans toucher au forfait.
+     *
+     * @return array{id: ?string, simulated: bool, testRemaining: ?int}
+     * @throws QuotaExceeded
+     */
+    public static function dispatch(array $tenant, string $kind, string $phone, string $body, int $ttlSeconds): array
+    {
+        if (empty($tenant['test'])) {
+            return ['id' => self::enqueue($tenant, $kind, $phone, $body, $ttlSeconds), 'simulated' => false, 'testRemaining' => null];
+        }
+
+        return Db::transaction(static function () use ($tenant, $kind, $phone, $body, $ttlSeconds): array {
+            // Decompte atomique : deux appels simultanes ne peuvent pas
+            // consommer le meme SMS d'essai.
+            $reserved = Db::run(
+                'UPDATE `otp_tenants` SET `testSmsUsed` = `testSmsUsed` + 1 WHERE `id` = ? AND `testSmsUsed` < `testSmsLimit`',
+                [$tenant['id']]
+            )->rowCount() === 1;
+
+            $row = Db::one('SELECT `testSmsLimit`, `testSmsUsed` FROM `otp_tenants` WHERE `id` = ?', [$tenant['id']]);
+            $remaining = max(0, (int) $row['testSmsLimit'] - (int) $row['testSmsUsed']);
+
+            if (!$reserved) {
+                return ['id' => null, 'simulated' => true, 'testRemaining' => 0];
+            }
+            return [
+                'id'            => self::enqueue($tenant, $kind, $phone, $body, $ttlSeconds, true),
+                'simulated'     => false,
+                'testRemaining' => $remaining,
+            ];
+        });
+    }
+
+    /**
      * Verifie les plafonds puis met un SMS en file.
      *
      * @throws QuotaExceeded
      */
-    public static function enqueue(array $tenant, string $kind, string $phone, string $body, int $ttlSeconds): string
+    public static function enqueue(array $tenant, string $kind, string $phone, string $body, int $ttlSeconds, bool $test = false): string
     {
         $dayStart = gmdate('Y-m-d 00:00:00');
 
@@ -48,6 +87,7 @@ final class SmsQueue
             // Un OTP attend un utilisateur devant son ecran : il passe avant
             // les notifications.
             'priority'  => $kind === 'otp' ? 1 : 5,
+            'test'      => $test ? 1 : 0,
             'expiresAt' => Db::now($ttlSeconds),
         ]);
     }

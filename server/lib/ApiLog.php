@@ -26,6 +26,7 @@ final class ApiLog
     private static ?string $deviceId = null;
     private static ?string $keyPrefix = null;
     private static bool $skip = false;
+    private static bool $test = false;
 
     public static function start(): void
     {
@@ -38,8 +39,9 @@ final class ApiLog
         self::$keyPrefix = mb_substr($prefix, 0, 16);
     }
 
-    public static function tenant(string $id): void
+    public static function tenant(string $id, bool $test = false): void
     {
+        self::$test  = $test;
         self::$actor = 'project';
         self::$tenantId = $id;
     }
@@ -87,6 +89,7 @@ final class ApiLog
                 'errorCode'  => Http::$lastErrorCode,
                 'durationMs' => (int) round((microtime(true) - self::$start) * 1000),
                 'ip'         => mb_substr(Http::clientIp(), 0, 45),
+                'test'       => self::$test ? 1 : 0,
             ]);
 
             if (random_int(1, 500) === 1) {

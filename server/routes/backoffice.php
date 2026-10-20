@@ -55,6 +55,7 @@ return static function (Router $r): void {
         'errorCode'  => $l['errorCode'],
         'durationMs' => (int) $l['durationMs'],
         'ip'         => $l['ip'],
+        'test'       => (int) ($l['test'] ?? 0) === 1,
     ];
 
     $smsRow = static fn (array $s): array => [
@@ -72,6 +73,7 @@ return static function (Router $r): void {
         'expiresAt'   => Db::iso($s['expiresAt']),
         // Le texte d'un OTP contient le code : jamais affiche.
         'body'        => $s['kind'] === 'otp' ? null : $s['body'],
+        'test'        => (int) ($s['test'] ?? 0) === 1,
     ];
 
     $tenantBySlug = static function (string $slug): array {
@@ -139,6 +141,9 @@ return static function (Router $r): void {
                 'name'       => $t['name'],
                 'active'     => (int) $t['active'] === 1,
                 'dailyQuota' => (int) $t['dailyQuota'],
+                'origin'     => $t['origin'] ?? 'admin',
+                'testSms'    => ['limit' => (int) ($t['testSmsLimit'] ?? 0), 'used' => (int) ($t['testSmsUsed'] ?? 0)],
+                'liveKeys'   => (int) Db::value("SELECT COUNT(*) FROM `otp_api_keys` WHERE `tenantId` = ? AND `env` = 'live' AND `revokedAt` IS NULL", [$t['id']]),
                 'usedToday'  => (int) Db::value('SELECT COUNT(*) FROM `otp_sms_messages` WHERE `tenantId` = ? AND `createdAt` >= ?', [$t['id'], $dayStart]),
                 'calls24h'   => (int) Db::value('SELECT COUNT(*) FROM `otp_api_logs` WHERE `tenantId` = ? AND `createdAt` >= ?', [$t['id'], $since24h]),
                 'errors24h'  => (int) Db::value('SELECT COUNT(*) FROM `otp_api_logs` WHERE `tenantId` = ? AND `status` >= 400 AND `createdAt` >= ?', [$t['id'], $since24h]),
@@ -175,6 +180,7 @@ return static function (Router $r): void {
             'devices'      => $deviceRows(),
             'projects'     => $projects,
             'recentErrors' => $recentErrors,
+            'pendingAccess'=> (int) Db::value("SELECT COUNT(*) FROM `otp_access_requests` WHERE `status` = 'pending'"),
             'serverTime'   => gmdate('Y-m-d\TH:i:s\Z'),
         ]);
     });
@@ -186,7 +192,9 @@ return static function (Router $r): void {
 
         $keys = array_map(static fn (array $k): array => [
             'id'         => $k['id'],
-            'prefix'     => 'sk_' . $k['prefix'],
+            // Prefixe seul : les premieres cles (sk_<prefixe>_…) n ont pas de mention live/test.
+            'prefix'     => $k['prefix'],
+            'env'        => $k['env'],
             'label'      => $k['label'],
             'createdAt'  => Db::iso($k['createdAt']),
             'lastUsedAt' => Db::iso($k['lastUsedAt']),
@@ -229,6 +237,9 @@ return static function (Router $r): void {
             'dailyQuota'  => (int) $t['dailyQuota'],
             'active'      => (int) $t['active'] === 1,
             'createdAt'   => $iso($t['createdAt']),
+            'origin'      => $t['origin'],
+            'contact'     => ['name' => $t['contactName'], 'email' => $t['contactEmail'], 'phone' => $t['contactPhone']],
+            'testSms'     => ['limit' => (int) $t['testSmsLimit'], 'used' => (int) $t['testSmsUsed']],
             'keys'        => $keys,
             'endpoints7d' => $byEndpoint,
             'errorCodes7d'=> array_map(static fn (array $e): array => ['code' => $e['code'], 'count' => (int) $e['n']], $errorCodes),

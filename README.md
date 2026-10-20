@@ -61,6 +61,26 @@ if ($res['valid']) {
 $otp->sendSms($telephone, 'Votre commande KoliGo est en route.');
 ```
 
+## Ouvrir l'API a d'autres projets
+
+| Page | Pour qui |
+|---|---|
+| [`/teeeotp/docs/`](https://trugroup.cm/teeeotp/docs/) | Les developpeurs : documentation, exemples, formulaire **Demander un acces**, page de suivi |
+| [`/teeeotp/admin/`](https://trugroup.cm/teeeotp/admin/) | L'equipe TRU GROUP : integrations, journal API, SMS, telephones, demandes d'acces |
+
+**Deux sortes de cles** :
+
+- `sk_test_…` : quelques **vrais SMS** (`testSmsLimit`, 5 par defaut), puis **simulation**
+  (`"status": "simulated"`, rien ne part). Les reponses portent `testCode` pour les tests automatises.
+- `sk_live_…` : production, dans la limite de `dailyQuota`. Les premieres cles (`sk_<prefixe>_…`)
+  restent valides et sont de production.
+
+**Libre-service** : le developpeur remplit le formulaire de la documentation ; la demande arrive dans
+l'onglet *Demandes d'acces* du back-office. Une fois validee, un projet est cree avec une cle de **test**
+seulement, scellee (libsodium) avec le jeton du demandeur : elle ne se lit qu'avec son lien de suivi,
+une seule fois. La cle de production reste une decision de l'administrateur (fiche du projet →
+*Nouvelle cle de production*).
+
 ## API
 
 Tables prefixees `otp_` : la base est partagee avec le site trugroup.cm.
@@ -76,7 +96,7 @@ Erreurs au format `{ "error": { "code", "message" } }`, comme apisungku.
 | GET | `/v1/otp/{requestId}` | — | etat de la demande et du SMS |
 | POST | `/v1/sms` | `phone`, `message` (≤ 480), `ttlSeconds`? | 202 `id` |
 | GET | `/v1/sms/{id}` | — | `queued`, `sending`, `sent`, `delivered`, `failed`, `expired` |
-| GET | `/v1/me` | — | quota et consommation du jour |
+| GET | `/v1/me` | — | mode (`test`/`live`), quota, allocation de test, consommation du jour |
 
 Numeros acceptes : mobiles camerounais (`6XXXXXXXX`, `2376XXXXXXXX`, `+2376XXXXXXXX`).
 
@@ -91,8 +111,13 @@ Numeros acceptes : mobiles camerounais (`6XXXXXXXX`, `2376XXXXXXXX`, `+2376XXXXX
 
 | Methode | Chemin | Corps |
 |---|---|---|
-| POST | `/v1/projects` | `name`, `slug`, `senderLabel`?, `dailyQuota`? → `apiKey` (affichee une fois) |
-| POST | `/v1/projects/{slug}/keys` | — → nouvelle cle (rotation) |
+| POST | `/v1/projects` | `name`, `slug`, `senderLabel`?, `dailyQuota`?, `testSmsLimit`? → `apiKey` + `testApiKey` (affichees une fois) |
+| POST | `/v1/projects/{slug}/keys` | `env` (`live`/`test`) → nouvelle cle (rotation) |
+| POST | `/v1/admin/projects/{slug}/test` | `testSmsLimit`?, `reset`? |
+| GET | `/v1/admin/access-requests` | demandes d'acces |
+| POST | `/v1/admin/access-requests/{id}/approve` | `slug`?, `senderLabel`?, `testSmsLimit`?, `dailyQuota`?, `note`? |
+| POST | `/v1/admin/access-requests/{id}/reject` | `note`? |
+| POST | `/v1/admin/migrate` | cree les tables et colonnes ajoutees depuis l'installation |
 | POST | `/v1/devices` | `name`, `dailyLimit`? → `deviceToken` (affiche une fois) |
 | POST | `/v1/devices/{id}/active` | `active` |
 | GET | `/v1/admin/status` | telephones en ligne, SMS du jour, derniers envois |
@@ -117,6 +142,9 @@ Numeros acceptes : mobiles camerounais (`6XXXXXXXX`, `2376XXXXXXXX`, `+2376XXXXX
 3. Televerser le contenu de `server/` dans `public_html/teeeotp/`.
 4. Installer le schema : `curl -X POST "https://trugroup.cm/teeeotp/install.php?token=<INSTALL_TOKEN>"`,
    puis **supprimer** `install.php` et `schema.sql` du serveur et vider `INSTALL_TOKEN`.
+   Completer ensuite le schema : `curl -X POST https://trugroup.cm/teeeotp/v1/admin/migrate -H "X-Admin-Key: $ADMIN_API_KEY"`.
+   **A chaque mise a jour**, televerser `lib/Migrations.php` et lancer cette migration **avant** le reste du code :
+   le nouveau code peut lire des colonnes qui n'existent pas encore.
 5. Verifier : `curl https://trugroup.cm/teeeotp/v1/health`.
 6. Creer un projet :
    ```bash

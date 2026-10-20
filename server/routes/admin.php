@@ -19,7 +19,7 @@ return static function (Router $r): void {
         }
 
         $slug = (string) Http::input('slug', '');
-        if (preg_match('/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/', $slug) !== 1) {
+        if (!Tenants::validSlug($slug)) {
             Http::fail('slug : minuscules, chiffres et tirets, entre 3 et 50 caracteres.', 400);
         }
 
@@ -33,25 +33,18 @@ return static function (Router $r): void {
             Http::fail('dailyQuota doit etre compris entre 1 et 100000.', 400);
         }
 
+        $testSmsLimit = (int) Http::input('testSmsLimit', Config::int('TEST_SMS_LIMIT', 5));
+        if ($testSmsLimit < 0 || $testSmsLimit > 1000) {
+            Http::fail('testSmsLimit doit etre compris entre 0 et 1000.', 400);
+        }
+
         if (Db::one('SELECT `id` FROM `otp_tenants` WHERE `slug` = ?', [$slug]) !== null) {
             Http::fail("Le projet '$slug' existe deja. Utilisez POST /v1/projects/$slug/keys.", 409, 'SLUG_ALREADY_USED');
         }
 
-        $cle = Auth::generate('sk');
-        $tenantId = Db::transaction(static function () use ($name, $slug, $senderLabel, $dailyQuota, $cle): string {
-            $id = Db::insert('otp_tenants', [
-                'name'        => $name,
-                'slug'        => $slug,
-                'senderLabel' => $senderLabel,
-                'dailyQuota'  => $dailyQuota,
-            ]);
-            Db::insert('otp_api_keys', [
-                'tenantId' => $id,
-                'prefix'   => $cle['prefix'],
-                'hash'     => $cle['hash'],
-                'label'    => 'cle initiale',
-            ]);
-            return $id;
+        [$tenantId, $live, $test] = Db::transaction(static function () use ($name, $slug, $senderLabel, $dailyQuota, $testSmsLimit): array {
+            $id = Tenants::create(compact('name', 'slug', 'senderLabel', 'dailyQuota', 'testSmsLimit'));
+            return [$id, Tenants::issueKey($id, 'live', 'cle de production'), Tenants::issueKey($id, 'test', 'cle de test')];
         });
 
         Http::ok([
@@ -60,8 +53,11 @@ return static function (Router $r): void {
             'slug'          => $slug,
             'senderLabel'   => $senderLabel,
             'dailyQuota'    => $dailyQuota,
-            'apiKey'        => $cle['plaintext'],
-            'avertissement' => 'Conservez apiKey maintenant : elle ne sera plus jamais affichee.',
+            'testSmsLimit'  => $testSmsLimit,
+            'apiKey'        => $live,
+            'testApiKey'    => $test,
+            'avertissement' => 'Conservez les deux cles maintenant : elles ne seront plus jamais affichees. '
+                . 'La cle de test envoie au plus testSmsLimit vrais SMS, puis simule.',
         ], 201);
     });
 
@@ -74,17 +70,16 @@ return static function (Router $r): void {
             Http::fail("Projet '{$args['slug']}' introuvable.", 404);
         }
 
-        $cle = Auth::generate('sk');
-        Db::insert('otp_api_keys', [
-            'tenantId' => $tenant['id'],
-            'prefix'   => $cle['prefix'],
-            'hash'     => $cle['hash'],
-            'label'    => 'cle de rotation',
-        ]);
+        $env = (string) Http::input('env', 'live');
+        if (!in_array($env, ['live', 'test'], true)) {
+            Http::fail('env doit valoir live ou test.', 400);
+        }
+        $key = Tenants::issueKey($tenant['id'], $env, $env === 'test' ? 'cle de test' : 'cle de production');
 
         Http::ok([
             'slug'          => $tenant['slug'],
-            'apiKey'        => $cle['plaintext'],
+            'env'           => $env,
+            'apiKey'        => $key,
             'avertissement' => 'Les cles precedentes restent actives jusqu a revocation.',
         ], 201);
     });

@@ -138,6 +138,11 @@ final class Db
     public static function transaction(callable $work): mixed
     {
         $pdo = self::pdo();
+        // Reentrant : une operation transactionnelle appelee depuis une autre
+        // rejoint la transaction en cours au lieu d'en ouvrir une seconde.
+        if ($pdo->inTransaction()) {
+            return $work();
+        }
         $pdo->beginTransaction();
         try {
             $result = $work();
